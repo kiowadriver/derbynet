@@ -27,7 +27,7 @@ run_tests() {
     `dirname $0`/photo-setup.sh "$BASE_URL"
     `dirname $0`/test-photo-upload.sh "$BASE_URL"
 
-    `dirname $0`/test-basic-javascript.sh "$BASE_URL"
+    # `dirname $0`/test-basic-javascript.sh "$BASE_URL"
     `dirname $0`/test-each-role.sh "$BASE_URL"
     `dirname $0`/test-permissions.sh $BASE_URL
 
@@ -35,9 +35,9 @@ run_tests() {
     `dirname $0`/test-basic-javascript.sh "$BASE_URL"
     `dirname $0`/test-awards.sh "$BASE_URL" basic
     `dirname $0`/test-new-rounds.sh "$BASE_URL"
-    `dirname $0`/test-basic-javascript.sh "$BASE_URL"
+    # `dirname $0`/test-basic-javascript.sh "$BASE_URL"
     `dirname $0`/test-each-role.sh "$BASE_URL"
-
+    `dirname $0`/test-scenes.sh "$BASE_URL"
 
     `dirname $0`/test-photo-manipulations.sh "$BASE_URL"
     `dirname $0`/test-photo-assignments.sh "$BASE_URL"
@@ -54,6 +54,9 @@ run_tests() {
 ############################## Points Racing ##############################
     `dirname $0`/test-points-racing.sh "$BASE_URL"
 
+############################## Rounds Playlist ##############################
+    `dirname $0`/test-playlist.sh "$BASE_URL"
+
 ############################## One-Run-Per-Car Racing ##############################
     `dirname $0`/test-model-a-club.sh "$BASE_URL"
 
@@ -64,7 +67,7 @@ run_tests() {
     `dirname $0`/import-roster.sh "$BASE_URL"
     `dirname $0`/test-den-changes.sh "$BASE_URL"
     `dirname $0`/test-master-schedule.sh "$BASE_URL"
-    `dirname $0`/test-basic-javascript.sh "$BASE_URL"
+    # `dirname $0`/test-basic-javascript.sh "$BASE_URL"
     `dirname $0`/test-awards.sh "$BASE_URL" master
     `dirname $0`/test-new-rounds.sh "$BASE_URL"
     `dirname $0`/test-each-role.sh "$BASE_URL"
@@ -82,7 +85,10 @@ run_tests() {
     `dirname $0`/test-den-changes.sh "$BASE_URL"
     `dirname $0`/test-unused-lanes.sh "$BASE_URL"
 
+    `dirname $0`/test-balloting.sh "$BASE_URL"
+
     SNAPSHOT=$(mktemp /tmp/derby-snapshot.xml.XXXXX)
+    echo Taking snapshot in $SNAPSHOT
     curl_get "action.php?query=snapshot.get" > $SNAPSHOT
 
     `dirname $0`/test-import-results.sh "$BASE_URL"

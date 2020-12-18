@@ -51,6 +51,8 @@ array(
   // durable is true if the aggregate class was created explicitly by the user, otherwise
   // false if created while creating an aggregate round.
   (",  `constituents` VARCHAR(100) DEFAULT ''"
+   .(expected_schema_version() < 5 ? "" :
+     ",  `rankids` VARCHAR(100) DEFAULT ''")
    .", `durable` INTEGER"
   // ntrophies is the number of trophies to award for this class, or -1 to use
   // the standard value from settings.
@@ -160,7 +162,13 @@ make_index("Rounds", "round"),
 
 @include_once(sql_file_path('message-queue-table')),
 
+@include_once(sql_file_path('scene-tables')),
+
+@include_once(sql_file_path('playlist-table')),
+
 @include_once(sql_file_path('award-type-values')),
+
+@include_once(sql_file_path('balloting')),
 
 array(
 "INSERT INTO RaceInfo (itemkey, itemvalue) VALUES ('schema', ".expected_schema_version().")",

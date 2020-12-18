@@ -61,7 +61,7 @@ curl_post action.php "action=racer.pass&value=1&racer=20" | check_success
 curl_post action.php "action=settings.write&n-lanes=4" | check_success
 curl_post action.php "action=schedule.generate&roundid=1" | check_success
 
-curl_post action.php "action=select-heat&roundid=1&now_racing=1" | check_success
+curl_post action.php "action=heat.select&roundid=1&now_racing=1" | check_success
 
 # Fast Lions    1.100
 # Slow Tigers   5.500
@@ -135,7 +135,7 @@ curl_text "export.php" | sed -n -e '/START_JSON/,/END_JSON/ p' | tail -2 | head 
 
 # curl_get would parse the HTML and leave one tag per line
 # Thanh came in 4th by time, but with Harold ineligible, he becomes 3rd, and Sterling is 4th
-curl_text "standings.php" | grep '<tr' | grep "data-rankid=.2." | grep "insubgroup_column.>4<" | expect_one "Sterling Spalla"
+curl_text "standings.php" | grep '<tr' | grep "data-rankid=.2." | grep "col-insubgroup.>4<" | expect_one "Sterling Spalla"
 
 curl_get "action.php?query=standings.reveal" | expect_count catalog-entry 0
 # javascript: encodeURIComponent(JSON.stringify({kind: 'supergroup', key: 'supergroup', name: 'Pack'}))

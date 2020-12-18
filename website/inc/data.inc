@@ -111,6 +111,13 @@ function write_raceinfo($key, $val) {
 					   ':value' => $val));
 }
 
+function use_groups() {
+  return read_single_value('SELECT COUNT(*) FROM Classes') > 1;
+}
+
+function use_subgroups() {
+  return read_raceinfo_boolean('use-subgroups');
+}
 
 // GPRM sets these in "Advanced Settings", but they're not stored in the database.
 // Presumably they're in the Windows registry somewhere.
@@ -138,6 +145,16 @@ function supergroup_label_lc() {
 function use_master_sched() {
   return read_raceinfo_boolean('use-master-sched');
 }
+
+function image_base_dir() {
+  return  dirname(__FILE__, 2).DIRECTORY_SEPARATOR."Images";
+}
+function image_file_path($filename) {
+  return image_base_dir().DIRECTORY_SEPARATOR
+      .read_raceinfo("images-dir", 'Generic').DIRECTORY_SEPARATOR
+      .$filename;
+}
+
 function update_period() {
   return read_raceinfo('update-period', 2500);
 }
@@ -191,6 +208,10 @@ function high_water_rounds() {
 			   'round' => $rs[1]);
 }
 
+// When performing timer test heats, the current roundid is set to this value,
+// and the current heat is relatively arbitrary (counts up from 1).
+define('TIMER_TEST_ROUNDID', -100);
+
 // Returns an array value with elements for { classid => , roundid => , heat => }
 // describing the currently-running round and heat.
 function get_running_round() {
@@ -221,19 +242,23 @@ function get_running_round() {
       $config['now_racing'] = $val ? 1 : 0;
   }
 
-  $stmt = $db->prepare('SELECT round, class'
-					 .' FROM Rounds'
-					 .' INNER JOIN Classes'
-					 .' ON Rounds.classid = Classes.classid'
-					 .' WHERE roundid = :roundid'
-					 .' AND Rounds.classid = :classid');
-  $stmt->execute(array(':roundid' => @$config['roundid'],
-					   ':classid' => @$config['classid']));
-  $rs = $stmt->fetch(PDO::FETCH_ASSOC);
-//  if ($rs)
- {
-    $config['class'] = $rs['class'];
-    $config['round'] = $rs['round'];
+  if (@$config['roundid'] == TIMER_TEST_ROUNDID) {
+    $config['class'] = 'Timer Test';
+    $config['round'] = @$config['heat'];
+  } else if (@$config['roundid']) {
+    $stmt = $db->prepare('SELECT round, class'
+                         .' FROM Rounds'
+                         .' INNER JOIN Classes'
+                         .' ON Rounds.classid = Classes.classid'
+                         .' WHERE roundid = :roundid'
+                         .' AND Rounds.classid = :classid');
+    $stmt->execute(array(':roundid' => @$config['roundid'],
+                         ':classid' => @$config['classid']));
+    $rs = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($rs !== false) {
+      $config['class'] = $rs['class'];
+      $config['round'] = $rs['round'];
+    }
   }
 
   return $config;

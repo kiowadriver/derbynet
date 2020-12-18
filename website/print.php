@@ -62,14 +62,15 @@ uasort($doc_classes, 'order_by_name');
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
 <title>Printables</title>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="stylesheet" type="text/css" href="css/jquery-ui.min.css"/>
 <?php require('inc/stylesheet.inc'); ?>
-<link rel="stylesheet" type="text/css" href="css/jquery.mobile-1.4.2.css"/>
+<link rel="stylesheet" type="text/css" href="css/mobile.css"/>
 <link rel="stylesheet" type="text/css" href="css/print.css"/>
 <script type="text/javascript" src="js/jquery.js"></script>
 <script type="text/javascript" src="js/ajax-setup.js"></script>
-<script type="text/javascript" src="js/jquery-ui-1.10.4.min.js"></script>
+<script type="text/javascript" src="js/jquery-ui.min.js"></script>
 <script type="text/javascript" src="js/jquery.ui.touch-punch.min.js"></script>
-<script type="text/javascript" src="js/pseudo-mobile.js"></script>
+<script type="text/javascript" src="js/mobile.js"></script>
 <script type="text/javascript" src="js/print.js"></script>
 <script type="text/javascript">
 var doc_classes = <?php echo json_encode($doc_classes); ?>;
@@ -80,7 +81,7 @@ var doc_classes = <?php echo json_encode($doc_classes); ?>;
 
 
 <div class="block_buttons">
-    <input type="button" data-enhanced="true" id="print-selected"
+    <input type="button" id="print-selected"
            value="Print Selected" onclick="print_selected();"/>
 </div>
 
@@ -90,7 +91,7 @@ var doc_classes = <?php echo json_encode($doc_classes); ?>;
 
 $radio_count = 0;
 $last_type = '';
-echo "<div data-role='controlgroup'>\n";
+echo "<div class='mradiogroup'>\n";
 foreach ($doc_classes as $c => $details) {
   ++$radio_count;
   $options = $details['options'];
@@ -114,7 +115,9 @@ echo "</div>\n";  // controlgroup
 
 // Options for each document type are in a div[data-docname='...'], and so can
 // be switched on and off depending on which document type is chosen.
+$doc_index = 0;  // To distinguish radio options, if needed
 foreach ($doc_classes as $c => $details) {
+  ++$doc_index;
   echo "<div data-docname=\"".$c."\" class=\"sub-options hidden\">";
   echo "<p>Options for <b>".$details['name']."</b></p>";
   foreach ($details['options'] as $opt => $opt_data) {
@@ -132,6 +135,19 @@ foreach ($doc_classes as $c => $details) {
     } else if ($opt_data['type'] == 'string') {
       echo "<label for='".$ctrl_name."'>".$opt_data['desc']."</label>";
       echo "<input type='text' name='".$ctrl_name."' value='".$opt_data['default']."' class='param-string'/><br/>\n";
+    } else if ($opt_data['type'] == 'radio') {
+      // values:
+      $first_radio = true;
+      echo "<div class='mradiogroup'>\n";
+      foreach ($opt_data['values'] as $v) {
+        // {value:, desc:}
+        echo "<input type='radio' id=\"opt-$doc_index-$opt-$v[value]\""
+                  .($first_radio ? " checked=\"checked\"" : "")
+                  ." name=\"$ctrl_name\" value=\"$v[value]\"/>\n";
+        echo "<label for=\"opt-$doc_index-$opt-$v[value]\">$v[desc]</label>\n";
+        $first_radio = false;
+      }
+      echo "</div>\n";
     }
     echo "</div>\n";
   }
@@ -153,7 +169,7 @@ foreach ($doc_classes as $c => $details) {
           <option value="name">Last Name</option>
           <option value="class"><?php echo htmlspecialchars(group_label(), ENT_QUOTES, 'UTF-8'); ?></option>
       <?php
-      if (read_raceinfo_boolean('use-subgroups')) {
+      if (use_subgroups()) {
         echo "<option value='rank'>".htmlspecialchars(subgroup_label(), ENT_QUOTES, 'UTF-8')."</option>";
       } ?>
           <option value="car" selected="selected">Car Number</option>
@@ -167,8 +183,8 @@ foreach ($doc_classes as $c => $details) {
     <div id="sortorder-summary-div">
     </div>
 
-    <input type="button" data-enhanced="true" value="Select All" onclick="select_all(true)"/>
-    <input type="button" data-enhanced="true" value="Deselect All" onclick="select_all(false)"/>
+    <input type="button" value="Select All" onclick="select_all(true)"/>
+    <input type="button" value="Deselect All" onclick="select_all(false)"/>
 </div>
 </div>
 

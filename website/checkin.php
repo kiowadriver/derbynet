@@ -10,12 +10,10 @@ require_once('inc/checkin-table.inc');
 
 require_permission(CHECK_IN_RACERS_PERMISSION);
 
-// This is the racer check-in page.  It appears as a table of all the
-// registered racers, with a checkbox (actually, a "flipswitch",
-// thanks to transformations peformed by jquery mobile) for each
-// racer.  Clicking on the check-in button invokes some javascript
-// that sends an ajax POST request to check-in (or un-check-in) that
-// racer.  See checkin.js.
+// This is the racer check-in page.  It appears as a table of all the registered
+// racers, with a flipswitch for each racer.  Clicking on the check-in button
+// invokes some javascript that sends an ajax POST request to check-in (or
+// un-check-in) that racer.  See checkin.js.
 
 // In addition to the actual check-in, it's possible to change a
 // racer's car number from this form, or mark the racer for our
@@ -27,9 +25,8 @@ require_permission(CHECK_IN_RACERS_PERMISSION);
 
 // TODO- subgroups explanation
 
-// $use_subgroups, from GPRM settings, tells whether we're using
-// "subgroups" within each racing group.
-$use_subgroups = read_raceinfo_boolean('use-subgroups');
+$use_groups = use_groups();
+$use_subgroups = use_subgroups();
 
 // Our pack provides an "exclusively by scout" award, based on a
 // signed statement from the parent.  Collecting the statement is part
@@ -62,17 +59,19 @@ function column_header($text, $o) {
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
 <title>Check-In</title>
 <link rel="stylesheet" type="text/css" href="css/dropzone.min.css"/>
-<link rel="stylesheet" type="text/css" href="css/jquery.mobile-1.4.2.css"/>
+<link rel="stylesheet" type="text/css" href="css/mobile.css"/>
 <?php require('inc/stylesheet.inc'); ?>
 <link rel="stylesheet" type="text/css" href="css/main-table.css"/>
 <link rel="stylesheet" type="text/css" href="css/checkin.css"/>
 <script type="text/javascript" src="js/jquery.js"></script>
 <script type="text/javascript" src="js/ajax-setup.js"></script>
-<script type="text/javascript" src="js/mobile-init.js"></script>
 <script type="text/javascript">
 var g_order = '<?php echo $order; ?>';
+var g_action_on_barcode = "<?php
+  echo isset($_SESSION['barcode-action']) ? $_SESSION['barcode-action'] : "locate";
+?>";
 </script>
-<script type="text/javascript" src="js/jquery.mobile-1.4.2.min.js"></script>
+<script type="text/javascript" src="js/mobile.js"></script>
 <script type="text/javascript" src="js/dashboard-ajax.js"></script>
 <script type="text/javascript" src="js/modal.js"></script>
 <script type="text/javascript" src="js/webcam.js"></script>
@@ -85,11 +84,14 @@ make_banner('Racer Check-In');
 ?>
 
 <div class="block_buttons">
+  <img src="img/barcode.png" style="position: absolute; left: 16px; top: 80px;"
+      onclick="handle_barcode_button_click()"/>
+
   <input class="bulk_button"
-        type="button" value="Bulk" data-enhanced="true"
+        type="button" value="Bulk"
         onclick='show_bulk_form();'/>
 <?php if (have_permission(REGISTER_NEW_RACER_PERMISSION)) { ?>
-      <input type="button" value="New Racer" data-enhanced="true"
+      <input type="button" value="New Racer"
         onclick='show_new_racer_form();'/>
 <?php } ?>
 </div>
@@ -98,7 +100,9 @@ make_banner('Racer Check-In');
 <thead>
   <tr>
     <th/>
-    <th><?php echo column_header(group_label(), 'class'); ?></th>
+    <?php if ($use_groups) {
+        echo '<th>'.column_header(group_label(), 'class').'</th>';
+    } ?>
     <?php if ($use_subgroups) {
         echo '<th>'.subgroup_label().'</th>';
     } ?>
@@ -143,7 +147,7 @@ $n = 1;
 foreach ($stmt as $rs) {
   // TODO
   $rs['rankseq'] = $ranks[$rs['rankid']]['seq'];
-  checkin_table_row($rs, $xbs, $use_subgroups, $n);
+  checkin_table_row($rs, $use_groups, $use_subgroups, $xbs, $n);
   ++$n;
 }
 ?>
@@ -151,7 +155,7 @@ foreach ($stmt as $rs) {
 </table>
 <div class="block_buttons">
 <?php if (have_permission(REGISTER_NEW_RACER_PERMISSION)) { ?>
-      <input type="button" value="New Racer" data-enhanced="true"
+      <input type="button" value="New Racer"
         onclick='show_new_racer_form();'/>
 <?php } ?>
 </div>
@@ -228,18 +232,18 @@ foreach ($stmt as $rs) {
     </select>
   <br/>
   <label for="eligible">Trophy eligibility:</label>
-    <input type="checkbox" data-role="flipswitch" name="eligible" id="eligible"
+    <input type="checkbox" class="flipswitch" name="eligible" id="eligible"
             data-wrapper-class="trophy-eligible-flipswitch"
             data-off-text="Excluded"
             data-on-text="Eligible"/>
   <br/>
-  <input type="submit" data-enhanced="true"/>
-  <input type="button" value="Cancel" data-enhanced="true"
+  <input type="submit"/>
+  <input type="button" value="Cancel"
     onclick='close_modal("#edit_racer_modal");'/>
 
   <div id="delete_racer_extension">
     <input type="button" value="Delete Racer"
-           class="delete_button" data-enhanced="true"
+           class="delete_button"
            onclick="handle_delete_racer();"/>
   </div>
 </form>
@@ -264,19 +268,19 @@ foreach ($stmt as $rs) {
     ?>
 
     <div class="block_buttons">
-        <input type="submit" value="Capture &amp; Check In" data-enhanced="true" id="capture_and_check_in"
+        <input type="submit" value="Capture &amp; Check In" id="capture_and_check_in"
            onclick='g_check_in = true;'/>
         <br/>
-        <input type="submit" value="Capture Only" data-enhanced="true"
+        <input type="submit" value="Capture Only"
           onclick='g_check_in = false;'/>
-        <input type="button" value="Switch Camera" data-enhanced="true"
+        <input type="button" value="Switch Camera"
           onclick='handle_switch_camera();'/>
-        <input type="button" value="Cancel" data-enhanced="true"
+        <input type="button" value="Cancel"
           onclick='close_photo_modal();'/>
 
         <label id="autocrop-label" for="autocrop">Auto-crop after upload:</label>
         <div class="centered_flipswitch">
-          <input type="checkbox" data-role="flipswitch" name="autocrop" id="autocrop" checked="checked"/>
+          <input type="checkbox" class="flipswitch" name="autocrop" id="autocrop" checked="checked"/>
         </div>
     </div>
     <div class="dz-message"><span>NOTE: You can drop a photo here to upload instead</span></div>
@@ -285,17 +289,17 @@ foreach ($stmt as $rs) {
 
 
 <div id='bulk_modal' class="modal_dialog hidden block_buttons">
-  <input type="button" value="Bulk Check-In" data-enhanced="true"
+  <input type="button" value="Bulk Check-In"
     onclick="bulk_check_in(true);"/>
-  <input type="button" value="Bulk Check-In Undo" data-enhanced="true"
+  <input type="button" value="Bulk Check-In Undo"
     onclick="bulk_check_in(false);"/>
   <br/>
-  <input type="button" value="Bulk Numbering" data-enhanced="true"
+  <input type="button" value="Bulk Numbering"
     onclick="bulk_numbering();"/>
-  <input type="button" value="Bulk Eligibility" data-enhanced="true"
+  <input type="button" value="Bulk Eligibility"
     onclick="bulk_eligibility();"/>
   <br/>
-  <input type="button" value="Cancel" data-enhanced="true"
+  <input type="button" value="Cancel"
     onclick='close_modal("#bulk_modal");'/>
 </div>
 
@@ -315,15 +319,13 @@ foreach ($stmt as $rs) {
                value="101"/>
 
         <label for="renumber">Renumber cars that already have numbers?</label>
-        <div class="centered_flipswitch">
-          <input type="checkbox" data-role="flipswitch" name="renumber" id="renumber"
+          <input type="checkbox" class="flipswitch renumber-flip" name="renumber" id="renumber"
                  data-on-text="Yes" data-off-text="No"    />
-        </div>
       </div>
 
       <div id="elibility_controls" class="hidable">
         <label for="bulk_eligible">Trophy eligibility:</label>
-        <input type="checkbox" data-role="flipswitch"
+        <input type="checkbox" class="flipswitch eligible-flip"
                checked="checked"
                name="bulk_eligible" id="bulk_eligible"
                data-wrapper-class="trophy-eligible-flipswitch"
@@ -331,17 +333,34 @@ foreach ($stmt as $rs) {
                data-on-text="Eligible"/>
       </div>
     
-      <input type="submit" data-enhanced="true"/>
-      <input type="button" value="Cancel" data-enhanced="true"
+      <input type="submit"/>
+      <input type="button" value="Cancel"
         onclick='close_secondary_modal("#bulk_details_modal");'/>
     </form>
+</div>
+
+
+<div id="barcode_settings_modal" class="modal_dialog hidden block_buttons">
+  <form>
+    <h2>Barcode Responses</h2>
+    <input id="barcode-handling-locate" name="barcode-handling" type="radio" value="locate"/>
+    <label for="barcode-handling-locate">Locate racer</label>
+    <input id="barcode-handling-checkin" name="barcode-handling" type="radio" value="checkin"/>
+    <label for="barcode-handling-checkin">Check in racer</label>
+    <input id="barcode-handling-racer" name="barcode-handling" type="radio" value="racer-photo"/>
+    <label for="barcode-handling-racer">Capture racer photo</label>
+    <input id="barcode-handling-car" name="barcode-handling" type="radio" value="car-photo"/>
+    <label for="barcode-handling-car">Capture car photo</label>
+
+    <input type="submit" value="Close"/>
+  </form>
 </div>
 
 <?php require_once('inc/ajax-pending.inc'); ?>
 <div id="find-racer">
   <div id="find-racer-form">
     Find Racer:
-    <input type="text" id="find-racer-text" name="narrowing-text" data-enhanced="true"/>
+    <input type="text" id="find-racer-text" name="narrowing-text" class="not-mobile"/>
     <span id="find-racer-message"><span id="find-racer-index" data-index="1">1</span> of <span id="find-racer-count">0</span></span>
     <img onclick="cancel_find_racer()" src="img/cancel-20.png"/>
   </div>

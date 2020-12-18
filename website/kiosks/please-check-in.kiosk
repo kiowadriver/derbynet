@@ -3,10 +3,11 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
 <title>Please Check In</title>
-<script type="text/javascript" src="js/jquery.js"></script>
 <?php require('inc/stylesheet.inc'); ?>
 <link rel="stylesheet" type="text/css" href="css/kiosks.css"/>
-<script type="text/javascript" src="js/please-check-in.js"></script>
+<script type="text/javascript" src="js/jquery.js"></script>
+<?php require('inc/kiosk-poller.inc'); ?>
+<!-- script type="text/javascript" src="js/please-check-in.js"></script -->
 <script type="text/javascript">
  // Instead of dynamically tracking check-ins, we just reload the page every 30
  // seconds to update the list of missing racers.
@@ -14,13 +15,22 @@ $(function () { setInterval(function() { location.reload(true); }, 30000); });
 </script>
 <style>
 body { overflow: hidden; }
-li.first {
-  border-top: 2px solid black;
+.kiosk_heading {
+  border-bottom: 2px solid black;
+}
+.wanted_container {
+  column-width: 250px;
+  position: absolute;
+  top: 100px;
+  bottom: 0;
+}
+
+.wanted_container li {
+  font-size: 3vh;
 }
 </style>
 </head>
 <body>
-<?php require('inc/kiosk-poller.inc'); ?>
 <?php
 require_once('inc/data.inc');
 require_once('inc/schema_version.inc');
@@ -68,9 +78,10 @@ if ($prev_classid >= 0) {
 } else {
   echo '<p class="kiosk_title">All Participants Have Checked In</p>'."\n";
   echo '<div class="full_page_center">'."\n";
-  echo '<img src="img/cubscout_emblem_800.png"/>'."\n";
+  echo "<img src=\"image.php/emblem.png\"/>\n";
   echo '</div>'."\n";
 }
 ?>
+<?php require('inc/ajax-failure.inc'); ?>
 </body>
 </html>

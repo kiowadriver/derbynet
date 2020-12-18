@@ -25,8 +25,9 @@ require_once('inc/events.inc');
 //
 // message="FINISHED" & lane1="3.123"&place1="1"&..., etc.
 //
-// message="HEARTBEAT"
+// message="HEARTBEAT" & confirmed=0|1
 //  Response provides message to timer controller
+//  Confirmed means the timer has sent recognizable data.
 //
 // message="MALFUNCTION" & detectable=0|1 & error= message
 //   Signals lost connection or other problem with the timer
@@ -59,6 +60,9 @@ if (have_permission(TIMER_MESSAGE_PERMISSION)) {
     // timer device.  Otherwise, all we know is that derby-timer.jar is alive
     // and scanning.
     $timer_state->to_state(TIMER_SEARCHING);
+    // Upon getting a new timer connection, choose a new name for server-side
+    // timer log file (which we may well never create).
+    write_raceinfo("timer-log", tempnam(sys_get_temp_dir(), "timer-"));
     echo "\n  <success/>\n";
   } else if ($message == 'IDENTIFIED') {
     if (isset($_POST['lane_count']) && $_POST['lane_count'] > 0) {
@@ -76,7 +80,11 @@ if (have_permission(TIMER_MESSAGE_PERMISSION)) {
     if (isset($_POST['options'])) {
       write_raceinfo('timer-options', $_POST['options']);
     }
-    $timer_state->to_state(TIMER_CONNECTED);
+    if (isset($_POST['confirmed']) && $_POST['confirmed'] == 0) {
+      $timer_state->to_state(TIMER_UNCONFIRMED);
+    } else {
+      $timer_state->to_state(TIMER_CONNECTED);
+    }
     echo "\n  <success/>\n";
   } else if ($message == 'STARTED') {
     $timer_state->to_state(TIMER_RUNNING);
@@ -88,21 +96,34 @@ if (have_permission(TIMER_MESSAGE_PERMISSION)) {
       // switch was off.  We should prompt the race coordinator and offer to
       // record these times somewhere.
       echo "\n  <failure code='notracing'>Not racing now.</failure>\n";
-    } else if (write_heat_results()) {
-      send_replay_REPLAY();
-      $current = get_running_round();
-      advance_heat($current, 'next', /* show failure */ false);
-      $racing_state = get_racing_state();
-      echo "\n  <success/>\n";
+    } else {
+      $nlanes = get_lane_count();
+      $results = parse_heat_results($nlanes);
+      if (read_raceinfo_boolean('reverse-lanes')) {
+        $oldresults = $results;  // Copies the array
+        for ($i = 0; $i < $nlanes; ++$i) {
+          $results[$i] = $oldresults[$nlanes - $i - 1];
+        }
+      }
+      if (write_heat_results($results)) {
+        send_replay_REPLAY();
+        write_raceinfo('timer_current', '');
+        $current = get_running_round();
+        advance_heat($current, 'next', /* show failure */ false);
+        $racing_state = get_racing_state();
+        echo "\n  <success/>\n";
+      }
     }
     // If another heat is teed up, we'll immediately change state to
     // TIMER_STAGING, below.
     $timer_state->to_state(TIMER_CONNECTED);
   } else if ($message == 'HEARTBEAT') {
     echo "\n  <success/>\n";
-    // TODO: Capture other state information
     if ($timer_state->unhealthy()) {
       $timer_state->to_state(TIMER_CONNECTED);
+    }
+    if (isset($_POST['confirmed']) && $_POST['confirmed'] == 0) {
+      $timer_state->to_state(TIMER_UNCONFIRMED);
     }
   } else if ($message == 'MALFUNCTION') {
     $error_string = isset($_POST['error']) ? $_POST['error'] : "Malfunction";
@@ -129,21 +150,49 @@ if (have_permission(TIMER_MESSAGE_PERMISSION)) {
         ." not recognized.</failure>\n";
   }
 
+  $timer_current = read_raceinfo('timer_current', '');
+  $current = get_running_round();
+  if ($timer_current) {
+    $timer_current = explode('#', $timer_current);
+    if ($current['roundid'] != $timer_current[0] ||
+        $current['heat'] != $timer_current[1]) {
+      echo "\n <abort />\n";
+      if ($timer_state->state() != TIMER_UNCONFIRMED) {
+        $timer_state->to_state(TIMER_CONNECTED);
+      }
+      write_raceinfo('timer_current', '');
+    }
+  }
+  
   $tstate = $timer_state->state();
-  if ($racing_state && $tstate == TIMER_CONNECTED) {  // i.e., not staging or running
-    $current = get_running_round();
-    $stmt = $db->prepare('SELECT lane, finishtime FROM RaceChart'
-                         .' WHERE roundid = :roundid AND heat = :heat'
-                         .' ORDER BY lane');
-    $stmt->execute(array(':roundid' => $current['roundid'],
-                         ':heat' => $current['heat']));
+  if ($racing_state && ($tstate == TIMER_CONNECTED || $tstate == TIMER_UNCONFIRMED)) {
+    // i.e., not staging or running
     $pending = true;
     $mask = 0;
-    foreach ($stmt as $row) {
-      if ($row['finishtime'] || $row['finishplace']) {
-        $pending = false;
+    $nlanes = get_lane_count();
+    if ($current['roundid'] == TIMER_TEST_ROUNDID) {
+      $mask = (1 << $nlanes) - 1 - read_raceinfo('tt-mask', 0);
+    } else {
+      $stmt = $db->prepare('SELECT lane, finishtime, finishplace FROM RaceChart'
+                           .' WHERE roundid = :roundid AND heat = :heat'
+                           .' ORDER BY lane');
+      $stmt->execute(array(':roundid' => $current['roundid'],
+                           ':heat' => $current['heat']));
+      foreach ($stmt as $row) {
+        if ($row['finishtime'] || $row['finishplace']) {
+          $pending = false;
+        }
+        $mask |= (1 << ($row['lane'] - 1));
       }
-      $mask |= (1 << ($row['lane'] - 1));
+    }
+    if (read_raceinfo_boolean('reverse-lanes')) {
+      $oldmask = $mask;
+      $mask = 0;
+      for ($l = 0; $l < $nlanes; ++$l) {
+        if (($oldmask & (1 << $l)) != 0) {
+          $mask |= (1 << ($nlanes - $l - 1));
+        }
+      }
     }
     if ($pending) {
       echo '  <heat-ready lane-mask="'.$mask.'"'
@@ -152,8 +201,11 @@ if (have_permission(TIMER_MESSAGE_PERMISSION)) {
           .' roundid="'.$current['roundid'].'"'
           .' heat="'.$current['heat'].'"'
           .'/>'."\n";
-      $timer_state->to_state(TIMER_STAGING);
+      if ($tstate == TIMER_CONNECTED) {
+        $timer_state->to_state(TIMER_STAGING);
+      }
       // send_replay_START($current);
+      write_raceinfo('timer_current', $current['roundid'].'#'.$current['heat']);
     }
   }
 
@@ -161,9 +213,12 @@ if (have_permission(TIMER_MESSAGE_PERMISSION)) {
     echo '  <remote-start/>'."\n";
   }
 
+  echo "<remote-log send='".(read_raceinfo_boolean('timer-send-logs') ? "true" : "false")."'/>\n";
+  
   if (!$racing_state && ($tstate == TIMER_STAGING || $tstate == TIMER_RUNNING)) {
     echo "\n  <abort/>\n";
     $timer_state->to_state(TIMER_CONNECTED);
+    write_raceinfo('timer_current', '');
   }
   $timer_state->write(true);
 } else {

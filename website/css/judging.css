@@ -26,6 +26,13 @@
     overflow-y: auto;
 }
 
+#awards-empty {
+  font-weight: bold;
+  padding-left: 30px;
+  padding-right: 30px;
+  text-align: center;
+}
+
 #awards ul {
     margin-top: 0px;
     margin-bottom: 0px;
@@ -41,7 +48,7 @@
     border: 1px black solid;
 }
 
-#awards a {
+#awards ul a {
     color: black;
     cursor: pointer;
 }
@@ -63,6 +70,14 @@
 #awards .recipient {
     float: right;
 }
+#awards .votes {
+  float: right;
+  margin-top: 10px;
+  margin-right: 5px;
+  border: 1px solid black;
+  padding: 2px;
+}
+
 #racers {
     position: absolute;
     left: 300px;
@@ -140,11 +155,44 @@
     font-size: inherit;
 }
 
+#ballot_modal_awards {
+  margin-bottom: 35px;
+}
+#ballot_modal_awards label {
+  font-size: 16px;
+  margin-left: 15px;
+  margin-right: 10px;
+}
+#ballot_modal_awards select {
+  font-size: 16px;
+}
+
+#ballot_results_tabulation {
+  margin-top: 20px;
+  margin-bottom: 35px;
+}
+
+#ballot-button-div {
+  position: absolute;
+  left: 25px;
+}
+
+#dd-prompt {
+  margin-left: 10px;
+  background: #ccc;
+  text-align: center;
+  font-size: 18px;
+  font-weight: bold;
+}
+
 #sort_controls {
   position: absolute;
-  right: 2px;
+  text-align: center;
+  right: 25px;
+  width: 300px;
   margin-top: 10px;
   font-size: 16px;
+  line-height: 20px;
 }
 
 #sort_controls a {

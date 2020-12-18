@@ -2,6 +2,7 @@
 
 require_once('inc/racing-state.inc');
 require_once('inc/replay.inc');
+require_once('inc/playlist.inc');
 
 // $current is an array as returned by get_running_round() (data.inc):
 //    classid =>
@@ -19,7 +20,9 @@ require_once('inc/replay.inc');
 function get_next_heat(&$current, $requested) {
   global $db;
 
-  if ($current['use_master_sched'] && !is_numeric($requested)) {
+  if ($current['use_master_sched'] && !is_numeric($requested) &&
+      // In timer test, ignore master heat scheduling
+      $current['roundid'] != TIMER_TEST_ROUNDID) {
     if ($requested == 'next-up') {
       $stmt = $db->prepare('SELECT roundid, heat FROM RaceChart'
                            .' WHERE masterheat = (SELECT MIN(masterheat)'
@@ -68,7 +71,7 @@ function get_next_heat(&$current, $requested) {
   }
 }
 
-// action.select-heat needs to handle changing rounds, in which case the
+// action.heat.select needs to handle changing rounds, in which case the
 // requested heat is always 1 (or could be 'first').
 
 
@@ -76,7 +79,7 @@ function get_next_heat(&$current, $requested) {
 // so some of these fields may be empty in $current.
 
 // This gets called either for manual heat change
-// (action.select-heat.inc) or automatic heat advancement in response
+// (action.heat.select.inc) or automatic heat advancement in response
 // to a timer message (action.timer-message.inc).
 
 function advance_heat(&$current, $requested, $report_failure) {
@@ -90,7 +93,7 @@ function advance_heat(&$current, $requested, $report_failure) {
     echo '<failure code="nosuchheat">No '.$requested.' heat available.</failure>';
   }
 
-  if ($ok) {
+  if ($ok && $next['roundid'] != TIMER_TEST_ROUNDID) {
     // Here: $next['roundid'] and $next['heat'] should have integer values that
     // identify the next (expected) heat.  It's possible the expected heat
     // doesn't exist or has already been run.
@@ -104,15 +107,17 @@ function advance_heat(&$current, $requested, $report_failure) {
 
   if (!$ok) {
     // If we got here, the requested heat doesn't exist.
-    {
-      set_racing_state(0);
+    set_racing_state(0);
+
+    if ($requested == 'next' && round_is_completed($current['roundid'])) {
+      perform_playlist_after_round($current['roundid']);
     }
     if ($report_failure) {
       echo '<failure code="nosuchheat">No heat '.@$next['heat'].' scheduled for roundid '.@$next['roundid'].'</failure>';
     }
   }
 
-  if ($ok) {  
+  if ($ok) {
     $roundid = $next['roundid'];
     $heat = $next['heat'];
 
@@ -135,6 +140,9 @@ function advance_heat(&$current, $requested, $report_failure) {
       if (!racing_state_allowed($current)) {
         // End of a group.  set_racing_state(0) will send a CANCEL
         set_racing_state(0);
+        if ($requested == 'next' && round_is_completed($roundid)) {
+          perform_playlist_after_round($roundid);
+        }
       } else {
         // Starting a new heat, roll camera
         send_replay_START($current);

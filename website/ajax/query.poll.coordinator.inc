@@ -1,51 +1,24 @@
 <coordinator_poll>
 <?php
+ // $_GET['roundid'] and $_GET['heat'] identify the "current" heat as the
+ // coordinator page sees it.
+
+require_once('inc/aggregate_round.inc');
+require_once('inc/classes-xml.inc');
 require_once('inc/current-heat.inc');
 require_once('inc/current-racers.inc');
-require_once('inc/schema_version.inc');
-require_once('inc/aggregate_round.inc');
+require_once('inc/heat-results.inc');
+require_once('inc/last-heat.inc');
+require_once('inc/playlist.inc');
 require_once('inc/remote-start.inc');
+require_once('inc/rounds.inc');
+require_once('inc/schema_version.inc');
+require_once('inc/timer-state-xml.inc');
 
 $now_running = get_running_round();
 emit_current_heat($now_running);
 emit_current_racers($now_running, FULL_NAME, /* photos */ false);
-?>
-<?php /* Timer */
-require_once('inc/timer-state.inc');
-
-$timer_state = new TimerState();
-$tstate = $timer_state->state();
-
-if ($tstate == TIMER_NOT_CONNECTED) {
-  $msg = 'NOT CONNECTED';
-  $icon = 'img/status/not_connected.png';
-} else if ($tstate == TIMER_SEARCHING) {
-  $msg = 'Scanning for timer';
-  $icon = 'img/status/unknown.png';
-} else if ($timer_state->troubled()) {
-  $msg = $timer_state->malfunction();
-  $icon = 'img/status/trouble.png';
-} else if ($tstate == TIMER_CONNECTED) {
-  $msg ='CONNECTED ('.($timer_state->seconds_since_last_contact()).' sec.)';
-  $icon = 'img/status/ok.png';
-} else if ($tstate == TIMER_STAGING) {
-  $msg = 'Staging';
-  $icon = 'img/status/ok.png';
-} else if ($tstate == TIMER_RUNNING) {
-  $msg = 'Race running';
-  $icon = 'img/status/ok.png';
-} else {
-  $msg = 'Unknown ('.$tstate.')';
-  $icon = 'img/status/trouble.png';
-}
-echo '<timer-state lanes="'.get_lane_count().'"'
-    .' last_contact="'.$timer_state->last_contact().'"'
-    .' state="'.$tstate.'"'
-    .' icon="'.$icon.'"'
-    .' remote_start="'.has_remote_start().'"'
-    .'>';
-echo $msg;
-echo '</timer-state>'."\n";
+emit_timer_state();
 ?>
 <?php /* Replay */
 require_once('inc/replay.inc');
@@ -68,23 +41,36 @@ echo '<replay-state'
     .'>';
 echo $msg;
 echo "</replay-state>\n";
+
+?>
+<?php  // last_heat
+echo last_heat_xml_element()."\n";
+
+$roundid = isset($_GET['roundid']) ? $_GET['roundid'] : '0';
+$heat = isset($_GET['heat']) ? $_GET['heat'] : '1';
+emit_heat_results($roundid, $heat);
+
+?>
+<?php  // Classes and Subgroups
+emit_all_classes();
+
 ?>
 <?php // Rounds
 
-$curr_round = $now_running; // Avoid an extra DB call: get_running_round();
-
-$stmt = $db->query('SELECT roundid, Rounds.classid, Classes.class, round,'
-                   .(schema_version() >= 3 ? ' constituents' : '\'\' AS constituents')
-                   .' FROM Rounds'
-                   .' INNER JOIN Classes ON Rounds.classid = Classes.classid'
-                   .' ORDER BY round DESC, '
-                   .(schema_version() >= 2 ? 'Classes.sortorder, ' : '')
-                   .'Classes.class');
-$rounds = array();
-foreach ($stmt as $round) {
-    $rounds[] = $round;
+$next_roundid = false;
+if (isset($now_running['roundid'])) {
+  $q = playlist_entry_for($now_running['roundid']);
+  if ($q) {
+    $q = playlist_entry_after($q['seq']);
+  } else {
+    $q = first_playlist_entry();
+  }
+  if ($q) {
+    $next_roundid = find_roundid($q['classid'], $q['round']);
+  }
 }
 
+$rounds = all_rounds_with_counts();
 
 foreach ($rounds as $round) {
     $roundid = $round['roundid'];
@@ -93,48 +79,45 @@ foreach ($rounds as $round) {
             .' classid="'.$round['classid'].'"'
             .' class="'.htmlspecialchars($round['class'], ENT_QUOTES, 'UTF-8').'"'
             .' round="'.$round['round'].'"';
-    if (is_aggregate_class($round)) {
-      echo ' aggregate="1"';
+    echo " aggregate=\"$round[aggregate]\"";
+    echo " roster_size=\"$round[roster_size]\"";
+    echo " passed=\"$round[passed]\"";
+    echo " unscheduled=\"$round[unscheduled]\"";
+    echo " heats_scheduled=\"$round[heats_scheduled]\"";
+    echo " heats_run=\"$round[heats_run]\"";
+    if ($round['roundid'] == $next_roundid) {
+      echo " next_round=\"true\"";
     }
+    echo '>'.htmlspecialchars($round['roundname'], ENT_QUOTES, 'UTF-8')."</round>\n";
+}
 
-    // Number of racers in the roster for the round
-    echo ' roster_size="'.read_single_value('SELECT COUNT(*) FROM Roster WHERE roundid = :roundid',
-                                            array(':roundid' => $roundid)).'"';
-
-    // Number of racers in the round who've passed inspection.  (After
-    // the first round, this should be the same as the roster size.)
-    echo ' passed="'.read_single_value('SELECT COUNT(*) FROM Roster'
-                                       .' INNER JOIN RegistrationInfo'
-                                       .' ON Roster.racerid = RegistrationInfo.racerid'
-                                       .' WHERE roundid = :roundid'
-                                       .' AND RegistrationInfo.passedinspection <> 0',
-                                       array(':roundid' => $roundid)).'"';
-
-    // Number of passed racers in the round who aren't in the schedule for the round
-    echo ' unscheduled="'.read_single_value('SELECT COUNT(*)'
-                                            .' FROM Roster'
-                                            .' INNER JOIN RegistrationInfo'
-                                            .' ON Roster.racerid = RegistrationInfo.racerid'
-                                            .' WHERE Roster.roundid = :roundid'
-                                            .' AND RegistrationInfo.passedinspection <> 0'
-                                            .' AND NOT EXISTS(SELECT 1 FROM RaceChart'
-                                            .'  WHERE RaceChart.roundid = Roster.roundid'
-                                            .'  AND RaceChart.racerid = Roster.racerid)',
-                                            array(':roundid' => $roundid)).'"';
-
-    echo ' heats_scheduled="'.read_single_value('SELECT COUNT(*) FROM'
-												.' (SELECT DISTINCT heat'
-                                                .'   FROM RaceChart'
-                                                .'   WHERE roundid = :roundid) AS tmp',
-                                                array(':roundid' => $roundid)).'"';
-
-    echo ' heats_run="'.read_single_value('SELECT COUNT(*) FROM'
-										  .' (SELECT DISTINCT heat'
-										  .'   FROM RaceChart'
-										  .'   WHERE roundid = :roundid'
-										  .'   AND (finishtime IS NOT NULL OR finishplace IS NOT NULL)) AS tmp',
-										  array(':roundid' => $roundid)).'"';
-    echo '/>'."\n";
+// Pre-defined aggregate classes that could be scheduled for racing:
+foreach (aggregate_classes() as $agg_class) {
+  $ready_to_race =
+      read_single_value('SELECT COUNT(*) FROM Rounds WHERE classid = :classid',
+                        array(':classid' => $agg_class['classid'])) == 0;
+  if ($ready_to_race) {
+    foreach ($agg_class['constituents'] as $classid) {
+      if (read_single_value('SELECT COUNT(*) FROM RaceChart'
+                            .' JOIN Rounds'
+                            .' ON RaceChart.roundid = Rounds.roundid'
+                            .' WHERE Rounds.classid = :classid'
+                            .'  AND (completed IS NOT NULL AND completed <> \'\')',
+                            array(':classid' => $classid))
+          == 0) {
+        $ready_to_race = false;
+      }
+    }
+  }
+  if ($ready_to_race) {
+    echo "<ready-aggregate"
+        ." classid=\"$agg_class[classid]\""
+        ." by-subgroup=\""
+        .(empty($agg_class['rankids']) ? '0' : '1')
+        ."\">";
+    echo htmlspecialchars($agg_class['class'], ENT_QUOTES, 'UTF-8');
+    echo "</ready-aggregate>\n";
+  }
 }
 ?>
 </coordinator_poll>

@@ -15,13 +15,13 @@ require_permission(PRESENT_AWARDS_PERMISSION);
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<link rel="stylesheet" type="text/css" href="css/jquery-ui.min.css"/>
 <title>Awards Presentation Dashboard</title><?php require('inc/stylesheet.inc'); ?>
 <script type="text/javascript" src="js/jquery.js"></script>
 <script type="text/javascript" src="js/ajax-setup.js"></script>
-<script type="text/javascript" src="js/jquery-ui-1.10.4.min.js"></script>
+<script type="text/javascript" src="js/jquery-ui.min.js"></script>
 <script type="text/javascript" src="js/dashboard-ajax.js"></script>
-<script type="text/javascript" src="js/mobile-init.js"></script>
-<script type="text/javascript" src="js/jquery.mobile-1.4.2.min.js"></script>
+<script type="text/javascript" src="js/mobile.js"></script>
 <script type="text/javascript" src="js/awards-presentation.js"></script>
 <?php
     try {
@@ -44,13 +44,13 @@ require_permission(PRESENT_AWARDS_PERMISSION);
       echo '</script>'."\n";
     }
 ?>
-<link rel="stylesheet" type="text/css" href="css/jquery.mobile-1.4.2.css"/>
+<link rel="stylesheet" type="text/css" href="css/mobile.css"/>
 <link rel="stylesheet" type="text/css" href="css/awards-presentation.css"/>
 </head>
 <body>
 <?php make_banner('Awards Presentation');
 
-$use_subgroups = read_raceinfo_boolean('use-subgroups');
+$use_subgroups = use_subgroups();
 
 list($classes, $classseq, $ranks, $rankseq) = classes_and_ranks();
 
@@ -150,13 +150,13 @@ usort($awards, 'compare_by_sort');
 </div>
 
 <div class="listview">
-<ul data-role="listview" class="ui-listview">
+<ul class="mlistview">
 <?php
 
 foreach ($awards as &$row) {
    $classid = isset($row['classid']) ? $row['classid'] : 0;
    $rankid = (isset($row['rankid']) && $use_subgroups) ? $row['rankid'] : 0;
-   echo '<li class="ui-btn ui-btn-icon-right ui-icon-carat-r'.($row['awardtypeid'] == AD_HOC_AWARDTYPEID ? ' adhoc' : '').'"'
+   echo '<li class="icon-right button '.($row['awardtypeid'] == AD_HOC_AWARDTYPEID ? ' adhoc' : '').'"'
         .' onclick="on_choose_award(this);"'
         .' data-awardkey="'.$row['awardkey'].'"'
         .' data-awardtypeid="'.$row['awardtypeid'].'"'
@@ -208,7 +208,7 @@ foreach ($awards as &$row) {
 <p id="carname" class="detail"></p>
 
 <div class="presenter-inner hidden">
-  <input type="checkbox" data-role="flipswitch"
+  <input type="checkbox" class="flipswitch"
         id="reveal-checkbox"
         data-on-text="Showing"
         data-off-text="Hidden"
@@ -216,7 +216,7 @@ foreach ($awards as &$row) {
 </div>
 
 <div class="block_buttons">
-    <input type="button" data-enhanced="true" value="Clear" onclick="on_clear_awards()"/>
+    <input type="button" value="Clear" onclick="on_clear_awards()"/>
 </div>
 
 </div>

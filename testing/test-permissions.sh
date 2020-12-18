@@ -3,6 +3,7 @@ BASE_URL=$1
 set -e -E -o pipefail
 source `dirname $0`/common.sh
 cat >anonymous.index.tmp <<EOF
+        <a class="button_link during_button" href="slideshow.php">Slideshow</a>
         <a class="button_link during_button" href="ondeck.php">Racers On Deck</a>
         <a class="button_link during_button" href="racer-results.php">Results By Racer</a>
         <a class="button_link after_button" href="export.php">Export Results</a>
@@ -37,7 +38,7 @@ curl_post action.php "action=photo" | check_failure
 curl_post action.php "action=replay-test" | check_failure
 curl_post action.php "action=schedule.reschedule" | check_failure
 curl_post action.php "action=schedule.generate" | check_failure
-curl_post action.php "action=select-heat" | check_failure
+curl_post action.php "action=heat.select" | check_failure
 curl_post action.php "action=timer-message" | check_failure
 curl_post action.php "action=award.xbs" | check_failure
 
@@ -88,6 +89,7 @@ cat >racecrew.index.tmp <<EOF
           <a class="button_link left before_button" href="photo-thumbs.php?repo=head"><b>Racer</b><br/>Photos</a>
           <a class="button_link right before_button" href="photo-thumbs.php?repo=car"><b>Car</b><br/>Photos</a>
         <a class="button_link during_button" href="judging.php">Judging</a>
+        <a class="button_link during_button" href="slideshow.php">Slideshow</a>
         <a class="button_link during_button" href="ondeck.php">Racers On Deck</a>
         <a class="button_link during_button" href="racer-results.php">Results By Racer</a>
         <a class="button_link after_button" href="standings.php">Standings</a>

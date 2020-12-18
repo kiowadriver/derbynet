@@ -37,7 +37,6 @@ require_once('inc/running_round_header.inc');
   echo "body { overflow: hidden; }\n";
   echo "</style>\n";
 }?>
-<?php require_once('inc/ajax-failure.inc'); ?>
 <script type="text/javascript">
 var g_update_status = {
       last_update_time: "", // First refresh is for everything
@@ -47,9 +46,12 @@ var g_update_status = {
       use_master_sched: <?php echo $use_master_sched ? 1 : 0; ?>,
       merge_rounds: <?php echo $use_master_sched ? 1 : 0; ?>,
 };
+// False if auto-scrolling should center the NEXT heat (the default), true if we
+// should scroll to focus on the current heat.
+var g_focus_current = <?php echo isset($_GET['focus_current']) ? "true" : "false"; ?>;
 </script>
 <script type="text/javascript" src="js/common-update.js"></script>
-<script type="text/javascript" src="js/update.js"></script>
+<script type="text/javascript" src="js/ondeck-update.js"></script>
 <script type="text/javascript">
 
 function handle_row_click(tr) {
@@ -158,7 +160,7 @@ foreach ($groups as $group) {
   echo '<tr><th/><th class="group_spacer wide" colspan="'.$nlanes.'"/></tr>'."\n";
   echo '<tr><th class="pre_group_title"/>'
       .'<th class="group_title wide" colspan="'.$nlanes.'">'
-      .htmlspecialchars($group['groupname'], ENT_QUOTES, 'UTF-8').'</th>'
+      .htmlspecialchars($group['roundname'], ENT_QUOTES, 'UTF-8').'</th>'
       .'</tr>'."\n";
 
   // Draw a new set of lane headers.
@@ -234,11 +236,12 @@ $stmt->closeCursor();
 ?>
 </table>
 
+<?php require_once('inc/ajax-failure.inc'); ?>
 
 <div id='photo_view_modal' class="modal_dialog hidden block_buttons">
   <img id='photo_view_img'/>
   <br/>
-  <input type="button" value="Close" data-enhanced="true"
+  <input type="button" value="Close"
     onclick='close_modal("#photo_view_modal");'/>
 </div>
 

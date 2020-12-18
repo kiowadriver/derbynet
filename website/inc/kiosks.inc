@@ -96,13 +96,54 @@ function kiosk_page($addr) {
                'params' => '');
 }
 
-function xml_for_kiosk_pages($prefix) {
+// Returns an array of {address, name, page, parameters, last_contact}
+function all_kiosks() {
+  global $db;
+  $kiosks = array();
+  try {
+    drop_old_kiosks();
+    $stmt = $db->query('SELECT address, name, page, last_contact'
+                       .' FROM Kiosks'
+                       .' ORDER BY '
+                       .'     CASE name WHEN \'Main\' THEN \'\' ELSE name END,'
+                       .'        address, last_contact');
+    foreach ($stmt as $row) {
+      parse_kiosk_params($row);
+      $kiosks[] = array('name' => $row['name'],
+                        'address' => $row['address'],
+                        'last_contact' => $row['last_contact'],
+                        'page' => $row['page'],
+                        'parameters' => $row['params']);
+    }
+  } catch (PDOException $p) {
+    // Most likely: no kiosks table.
+    // One will be created if a kiosk actually connects.
+  }
+  return $kiosks;
+}
+
+function xml_for_all_kiosks() {
+  foreach (all_kiosks() as $row) {
+    echo '<kiosk>'."\n";
+    echo '  <name>'.htmlspecialchars($row['name'], ENT_QUOTES, 'UTF-8').'</name>'."\n";
+    echo '  <address>'.htmlspecialchars($row['address'], ENT_QUOTES, 'UTF-8').'</address>'."\n";
+    echo '  <last_contact>'.floor((time() - $row['last_contact'])/60)
+    .' minute(s) ago</last_contact>'."\n";
+    echo '  <assigned_page>'.htmlspecialchars($row['page'], ENT_QUOTES, 'UTF-8').'</assigned_page>'."\n";
+    echo '  <parameters>'.htmlspecialchars($row['parameters'], ENT_QUOTES, 'UTF-8').'</parameters>'."\n";
+    echo '</kiosk>'."\n";
+  }
+}
+
+function all_kiosk_pages_with_prefix($prefix) {
   $entries = array();
   $dh = opendir(dirname($_SERVER['SCRIPT_FILENAME']).DIRECTORY_SEPARATOR.$prefix);
   if ($dh !== false) {
     while (($entry = readdir($dh)) !== FALSE) {
       if (substr($entry, -6) == ".kiosk") {
-        $entries[] = substr($entry, 0, -6);
+        $brief = substr($entry, 0, -6);
+        $entries[] = array('brief' => $brief,
+                           'full' => $prefix.DIRECTORY_SEPARATOR.$entry);
       }
     }
   }
@@ -110,10 +151,20 @@ function xml_for_kiosk_pages($prefix) {
 
   sort($entries);
 
+  return $entries;
+}
+
+function all_kiosk_pages() {
+  $configdir = isset($_SERVER['CONFIG_DIR']) ? $_SERVER['CONFIG_DIR'] : 'local';
+  return array_merge(all_kiosk_pages_with_prefix('kiosks'),
+                     all_kiosk_pages_with_prefix($configdir.DIRECTORY_SEPARATOR.'kiosks'));
+}
+
+function xml_for_kiosk_pages() {
+  $entries = all_kiosk_pages();
   foreach ($entries as $entry) {
-    $value = $prefix.DIRECTORY_SEPARATOR.$entry;
-    echo '<kiosk-page brief="'.htmlspecialchars($entry, ENT_QUOTES, 'UTF-8').'">'
-        .htmlspecialchars($value, ENT_QUOTES, 'UTF-8').'.kiosk</kiosk-page>'."\n";
+    echo '<kiosk-page brief="'.htmlspecialchars($entry['brief'], ENT_QUOTES, 'UTF-8').'">'
+        .htmlspecialchars($entry['full'], ENT_QUOTES, 'UTF-8').'</kiosk-page>'."\n";
   }
 }
 
@@ -123,7 +174,6 @@ function xml_for_kiosk_pages($prefix) {
 // remain in the database on race day.
 function drop_old_kiosks() {
   global $db;
-  // 300 seconds in five minutes
-  $stmt = $db->query('DELETE FROM Kiosks WHERE '.time().' - last_contact > 300');
+  $stmt = $db->query('DELETE FROM Kiosks WHERE '.time().' - last_contact > 30');
 }
 ?>

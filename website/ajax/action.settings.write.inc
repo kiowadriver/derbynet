@@ -36,15 +36,18 @@ if (have_permission(SET_UP_PERMISSION)) {
     // ===========================================================================
     // Checkbox settings: look for "-checkbox" entry, and optional $_POST key for true
     // $_POST key => RaceInfo.itemkey
-    foreach(array('warn-no-timer' => 'warn-no-timer',
-                  'do-use-subgroups' => 'use-subgroups',
+    foreach(array('do-use-subgroups' => 'use-subgroups',
+                  'one-trophy-per' => 'one-trophy-per',
+                  'reverse-lanes' => 'reverse-lanes',
+                  'show-car-photos-on-deck' => 'show-cars-on-deck',
+                  'show-car-photos-rr' => 'show-car-photos-rr',
+                  'show-racer-photos-rr' => 'show-racer-photos-rr',
+                  'upload-videos' => 'upload-videos',
                   'use-master-sched' => 'use-master-sched',
                   'use-points' => 'use-points',
-                  'show-car-photos-on-deck' => 'show-cars-on-deck',
-                  'show-racer-photos-rr' => 'show-racer-photos-rr',
-                  'show-car-photos-rr' => 'show-car-photos-rr',
-                  'upload-videos' => 'upload-videos',
-                  'use-xbs' => 'use-xbs')
+                  'use-xbs' => 'use-xbs',
+                  'warn-no-timer' => 'warn-no-timer'
+              )
             as $post_key => $raceinfo_key) {
       if (isset($_POST[$post_key.'-checkbox'])) {
         ++$num_picked;
@@ -75,10 +78,15 @@ if (have_permission(SET_UP_PERMISSION)) {
                   'replay-skipback' => 'replay-skipback',
                   'replay-num-showings' => 'replay-num-showings',
                   'replay-rate' => 'replay-rate',
+                  'timer-send-logs' => 'timer-send-logs',
                   'unused-lane-mask' => 'unused-lane-mask',
                   'max-runs-per-car' => 'max-runs-per-car',
                   'finish-formatting' => 'finish-formatting',
-                  'scoring' => 'scoring')
+                  'scoring' => 'scoring',
+                  'now-racing-linger-ms' => 'now-racing-linger-ms',
+                  'racing_scene' => 'racing_scene',
+                  'images-dir' => 'images-dir',
+                  'ballot_password' => 'ballot_password')
             as $post_key => $raceinfo_key) {
       if (isset($_POST[$post_key])) {
         ++$num_picked;

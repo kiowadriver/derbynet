@@ -1,9 +1,0 @@
-#! /bin/sh
-
-./maybe-create-local-directory.sh
-./create-apache-derbynet-directory.sh
-./create-or-update-php-ini.sh
-./update-apache-config.sh
-./maybe-rewrite-index-html.sh
-
-open http://localhost/derbynet

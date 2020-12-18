@@ -12,7 +12,7 @@ import org.jeffpiazza.derby.Message;
 // For testing the web server and the derby-timer framework, simulate
 // a device class
 public class SimulatedDevice extends TimerDeviceBase
-                             implements RemoteStartInterface {
+    implements RemoteStartInterface {
   private HeatRunner runningHeat = null;
 
   private Random random;
@@ -29,7 +29,11 @@ public class SimulatedDevice extends TimerDeviceBase
   @Override
   public boolean probe() throws SerialPortException {
     // 50% chance of "discovering" our fake device on a given port
-    return random.nextFloat() < 0.50;
+    if (random.nextFloat() < 0.50) {
+      has_ever_spoken = !Flag.simulate_has_not_spoken.value();
+      return true;
+    }
+    return false;
   }
 
   @Override
@@ -38,15 +42,21 @@ public class SimulatedDevice extends TimerDeviceBase
   }
 
   @Override
-  public String getTimerIdentifier() { return null; }
+  public String getTimerIdentifier() {
+    return null;
+  }
 
   @Override
   public void prepareHeat(int roundid, int heat, int laneMask)
       throws SerialPortException {
     synchronized (this) {
       if (runningHeat == null) {
-        System.out.println("STAGING:  heat " + heat + " of roundid " + roundid + ": "
-            + LogWriter.laneMaskString(laneMask, Flag.lanes.value()));
+        final String stagingMessage = "STAGING:  heat " + heat
+            + " of roundid " + roundid + ": "
+            + LogWriter.laneMaskString(laneMask, Flag.lanes.value());
+        System.out.println(stagingMessage);
+        LogWriter.serialIn(stagingMessage);
+
         runningHeat = new HeatRunner(roundid, heat, laneMask);
         (new Thread(runningHeat)).start();
       } // TODO Confirm roundid/heat match runningHeat
@@ -60,7 +70,10 @@ public class SimulatedDevice extends TimerDeviceBase
   @Override
   public void abortHeat() throws SerialPortException {
     System.out.println("SimulatedDevice.abortHeat called");
-    // TODO cancel heatrunner
+    if (runningHeat != null) {
+      runningHeat.cancel();
+      runningHeat = null;
+    }
   }
 
   @Override
@@ -81,8 +94,7 @@ public class SimulatedDevice extends TimerDeviceBase
     if ((pollCount % 1000) == 0
         || (pollCount < 1000 && (pollCount % 100) == 0)
         || pollCount < 10) {
-      // TODO System.out.println("SimulatedDevice.poll() called "
-      //                         + pollCount + " time(s).");
+      LogWriter.serial("SimulatedDevice.poll");
     }
   }
 
@@ -92,6 +104,7 @@ public class SimulatedDevice extends TimerDeviceBase
     private int roundid;
     private int heat;
     private int lanemask;
+    private boolean canceled = false;
 
     public HeatRunner(int roundid, int heat, int lanemask) {
       this.roundid = roundid;
@@ -99,15 +112,37 @@ public class SimulatedDevice extends TimerDeviceBase
       this.lanemask = lanemask;
     }
 
-    public int roundid() { return roundid; }
-    public int heat() { return heat; }
+    public int roundid() {
+      return roundid;
+    }
+
+    public int heat() {
+      return heat;
+    }
+
+    public synchronized void cancel() {
+      this.canceled = true;
+    }
 
     public void run() {
       pause(Flag.pace.value());
-      System.out.println("GO!       heat " + heat + " of roundid " + roundid + " begins.");
+      synchronized (this) {
+        if (canceled) {
+          return;
+        }
+      }
+      LogWriter.serialOut("SimulatedDevice.run()");
+      final String goMessage = "GO!       heat " + heat
+          + " of roundid " + roundid + " begins.";
+      System.out.println(goMessage);
+      LogWriter.serialIn(goMessage);
       invokeRaceStartedCallback();
+      LogWriter.serialOut("pause");
       pause(4);  // 4 seconds for a pretty slow race
-      System.out.println("COMPLETE: heat " + heat + " of roundid " + roundid + " finishes.");
+      final String completeMessage = "COMPLETE: heat " + heat
+          + " of roundid " + roundid + " finishes.";
+      System.out.println(completeMessage);
+      LogWriter.serialIn(completeMessage);
       invokeRaceFinishedCallback(roundid, heat, makeHeatResults(lanemask));
       endRunningHeat();
     }

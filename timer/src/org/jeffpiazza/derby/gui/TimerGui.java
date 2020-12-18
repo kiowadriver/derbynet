@@ -19,9 +19,6 @@ import org.jeffpiazza.derby.devices.TimerTask;
 public class TimerGui {
   private Components components;
   private Connector connector;
-  private boolean traceMessages;
-  private boolean traceHeartbeats;
-  private boolean traceResponses;
   private RoleFinder roleFinder;
   private boolean rolesPopulated = false;
 
@@ -31,9 +28,6 @@ public class TimerGui {
   public TimerGui(Connector connector) {
     this.components = new Components();
     this.connector = connector;
-    this.traceMessages = traceMessages;
-    this.traceHeartbeats = traceHeartbeats;
-    this.traceResponses = traceResponses;
     timerClassListController = new TimerClassListController(
         components.timerClassList);
     components.timerClassList.addListSelectionListener(timerClassListController);
@@ -279,10 +273,14 @@ public class TimerGui {
     System.out.println("Scan/Stop Scanning button not implemented");
   }
 
-  public void confirmDevice() {
+  public void confirmDevice(boolean confirmed) {
     components.portList.setSelectionBackground(green);
     components.timerClassList.setSelectionBackground(green);
-    setSerialStatus("Timer device identified", green, icon_ok);
+    if (confirmed) {
+      setSerialStatus("Timer device identified", green, icon_ok);
+    } else {
+      setSerialStatus("Timer device unconfirmed", red, icon_unknown);
+    }
     // TODO components.scanButton.setVisible(false);
   }
 

@@ -10,6 +10,7 @@ function all_classes() {
   $stmt = $db->prepare('SELECT Classes.classid, class, rankid, rank, '
                        .(schema_version() >= 3 ? 'ntrophies, ' : '-1 as ntrophies, ')
                        .(schema_version() >= 3 ? 'constituents, ' : '\'\' as constituents, ')
+                       .(schema_version() >= 5 ? 'rankids, ' : '\'\' as rankids, ')
                        .' (SELECT COUNT(*) FROM RegistrationInfo WHERE RegistrationInfo.classid = Classes.classid) AS nclass,'
                        .' (SELECT COUNT(*) FROM RegistrationInfo WHERE RegistrationInfo.rankid = Ranks.rankid) AS nrank,'
                        .' (SELECT COUNT(*) FROM Rounds'
@@ -32,6 +33,7 @@ function all_classes() {
                          'name' => $row['class'],
                          'ntrophies' => $row['ntrophies'],
                          'constituents' => $row['constituents'],
+                         'rankids' => $row['rankids'],
                          'count' => $row['nclass'],
                          'nrounds_with_results' => $row['nrounds'],
                          'ranks' => []);
@@ -57,14 +59,11 @@ function all_classes() {
 // classes, which don't have any ranks.
 function classes_and_ranks() {
   global $db;
-  $use_subgroups = read_raceinfo_boolean('use-subgroups');
-  $n_den_trophies = read_raceinfo('n-den-trophies', 3);
-  $n_pack_trophies = read_raceinfo('n-pack-trophies', 3);
 
-  $classes = array();  // classid => {'class', 'seq'}
-  $classseq = array(); // ordered classids
-  $ranks = array();    // rankid => {'class', 'rank'}
-  $rankseq = array();  // ordered rankids
+  $classes = array();
+  $classseq = array();
+  $ranks = array();
+  $rankseq = array();
   foreach ($db->query('SELECT Classes.classid, class, rankid, rank,'
                       .(schema_version() >= 3
                         ? 'constituents, ntrophies'
@@ -78,7 +77,8 @@ function classes_and_ranks() {
     if (!isset($classes[$row['classid']])) {
       $classseq[] = $row['classid'];
       $classes[$row['classid']] = array('class' => $row['class'],
-                                        'constituents' => explode(',', $row['constituents']),
+                                        'constituents' => array_filter(explode(',', $row['constituents']),
+                                                                       'strlen'),
                                         'ntrophies' => $row['ntrophies'],
                                         'seq' => count($classseq));
     }

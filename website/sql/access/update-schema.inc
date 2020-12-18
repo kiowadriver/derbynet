@@ -15,5 +15,39 @@ if (schema_version() < 2) {
   $updates[] = "INSERT INTO RaceInfo(ItemKey, ItemValue) VALUES('schema', '2')";
 }
 
+if (schema_version() < 3) {
+  $updates[] = "ALTER TABLE Classes ADD COLUMN constituents VARCHAR(100) DEFAULT ''";
+  $updates[] = "ALTER TABLE Classes ADD COLUMN durable INTEGER";
+  $updates[] = "ALTER TABLE Classes ADD COLUMN ntrophies INTEGER DEFAULT -1";
+
+  $updates[] = "DELETE FROM RaceInfo WHERE itemkey = 'schema'";
+  $updates[] = "INSERT INTO RaceInfo(itemkey, itemvalue) VALUES('schema', '3')";
+}
+
+if (schema_version() < 4) {
+  $updates = array_merge($updates,
+                         @include_once(sql_file_path('message-queue-table')),
+                         @include_once(sql_file_path('scene-tables')),
+                         @include_once(sql_file_path('playlist-table')));
+
+  $updates[] = "DELETE FROM RaceInfo WHERE itemkey = 'schema'";
+  $updates[] = "INSERT INTO RaceInfo(itemkey, itemvalue) VALUES('schema', '4')";
+}
+
+if (schema_version() < 5) {
+  $updates[] = "ALTER TABLE Classes ADD COLUMN rankids VARCHAR(100) DEFAULT ''";
+
+  $updates[] = "DELETE FROM RaceInfo WHERE itemkey = 'schema'";
+  $updates[] = "INSERT INTO RaceInfo(itemkey, itemvalue) VALUES('schema', '5')";
+}
+
+if (schema_version() < 6) {
+  $updates = array_merge($updates,
+                         @include_once(sql_file_path('balloting')));
+
+  $updates[] = "DELETE FROM RaceInfo WHERE itemkey = 'schema'";
+  $updates[] = "INSERT INTO RaceInfo(itemkey, itemvalue) VALUES('schema', '6')";
+}
+
 return $updates;
 ?>

@@ -31,7 +31,11 @@ public class HttpTask implements Runnable {
   // Called when it's time to send a heartbeat to the web server, which we'll
   // do only if the timer is healthy (connected).
   public interface TimerHealthCallback {
-    boolean isTimerHealthy();
+    public static final int UNHEALTHY = 0;
+    public static final int PRESUMED_HEALTHY = 1;
+    public static final int HEALTHY = 2;
+
+    int getTimerHealth();
   }
 
   // Called when a PREPARE_HEAT message is received from the web server
@@ -61,6 +65,7 @@ public class HttpTask implements Runnable {
   public static void start(final ClientSession session,
                            final Connector connector,
                            final LoginCallback callback) {
+    LogWriter.setClientSession(session);
     (new Thread() {
       @Override
       public void run() {
@@ -90,17 +95,16 @@ public class HttpTask implements Runnable {
   public HttpTask(ClientSession session) {
     this.session = session;
     this.queue = new ArrayList<Message>();
-    this.traceQueued = traceQueued;
-    this.traceHeartbeat = traceHeartbeat;
-    this.traceResponses = traceResponses;
     synchronized (queue) {
       queueMessage(new Message.Hello());
     }
   }
 
-  public void sendIdentified(int nlanes, String timer, String identifier) {
+  public void sendIdentified(int nlanes, String timer, String identifier,
+                             boolean confirmed) {
     synchronized (queue) {
-      queueMessage(new Message.Identified(nlanes, timer, identifier));
+      queueMessage(new Message.Identified(nlanes, timer, identifier,
+                                          confirmed));
     }
   }
 
@@ -170,7 +174,6 @@ public class HttpTask implements Runnable {
   // queue, sending queued events; otherwise sends a HEARTBEAT and
   // sleeps a known amount of time.
   public void run() {
-    System.err.println("Running HttpTask");
     while (true) {
       Element response = null;
       boolean trace;
@@ -188,11 +191,17 @@ public class HttpTask implements Runnable {
           trace = this.traceQueued;
         } else {
           TimerHealthCallback timerHealth = getTimerHealthCallback();
-          if (timerHealth != null && timerHealth.isTimerHealthy()) {
+          if (timerHealth != null) {
+            int health = timerHealth.getTimerHealth();
             // Send heartbeats only if we've actually identified the timer and
-            // it's healthy.
-            nextMessage = new Message.Heartbeat();
-            log = trace = this.traceHeartbeat;
+            // it's not unhealthy.
+            if (health != TimerHealthCallback.UNHEALTHY) {
+              nextMessage = new Message.Heartbeat(
+                  health == TimerHealthCallback.HEALTHY);
+              log = trace = this.traceHeartbeat;
+            } else {
+              continue;
+            }
           } else {
             continue;
           }
@@ -235,6 +244,19 @@ public class HttpTask implements Runnable {
         }
       }
 
+      NodeList remote_logs = response.getElementsByTagName("remote-log");
+      if (remote_logs.getLength() > 0) {
+        LogWriter.setRemoteLogging(Boolean.parseBoolean(
+            ((Element) remote_logs.item(0)).getAttribute("send")));
+      }
+
+      if (response.getElementsByTagName("abort").getLength() > 0) {
+        AbortHeatCallback cb = getAbortHeatCallback();
+        if (cb != null) {
+          cb.onAbortHeat();
+        }
+      }
+
       NodeList heatReadyNodes = response.getElementsByTagName("heat-ready");
       if (heatReadyNodes.getLength() > 0) {
         HeatReadyCallback cb = getHeatReadyCallback();
@@ -244,13 +266,6 @@ public class HttpTask implements Runnable {
           int roundid = parseIntOrZero(heatReady.getAttribute("roundid"));
           int heat = parseIntOrZero(heatReady.getAttribute("heat"));
           cb.onHeatReady(roundid, heat, lanemask);
-        }
-      }
-
-      if (response.getElementsByTagName("abort").getLength() > 0) {
-        AbortHeatCallback cb = getAbortHeatCallback();
-        if (cb != null) {
-          cb.onAbortHeat();
         }
       }
 

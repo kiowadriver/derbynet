@@ -39,10 +39,11 @@ if (isset($_REQUEST['address'])) {
   $kiosk_url .= "?address=".$_REQUEST['address'];
 }
 ?>
+<link rel="stylesheet" type="text/css" href="css/jquery-ui.min.css"/>
 <link rel="stylesheet" type="text/css" href="css/replay.css"/>
 <script type="text/javascript" src="js/jquery.js"></script>
 <script type="text/javascript" src="js/ajax-setup.js"></script>
-<script type="text/javascript" src="js/jquery-ui-1.10.4.min.js"></script>
+<script type="text/javascript" src="js/jquery-ui.min.js"></script>
 <script type="text/javascript" src="js/screenfull.min.js"></script>
 <script type="text/javascript" src="js/adapter.js"></script>
 <script type="text/javascript" src="js/message-poller.js"></script>
@@ -51,6 +52,14 @@ if (isset($_REQUEST['address'])) {
 <script type="text/javascript" src="js/circular-frame-buffer.js"></script>
 <script type="text/javascript" src="js/video-device-picker.js"></script>
 <script type="text/javascript">
+
+function logmessage(txt) {
+  $("<p></p>").text(txt).appendTo($("#log"));
+  let msgs = $("#log p");
+  if (msgs.length > 20) {
+    msgs.slice(0, -20).remove();
+  }
+}
 
 // TODO Poll for messages.
 // In the meantime, use the existing replay protocol
@@ -135,6 +144,16 @@ function on_stream_ready(stream) {
   document.getElementById("preview").srcObject = stream;
 }
 
+function on_remote_stream_ready(stream) {
+  let resize = function(w, h) {
+    $("#recording-stream-info").removeClass('hidden');
+    $("#recording-stream-size").text(w + 'x' + h);
+  };
+  resize(-1, -1);  // Says we've got a stream, even if no frames yet.
+  on_stream_ready(stream);
+  g_recorder.on_resize(resize);
+}
+
 function on_device_selection(selectq) {
   // If a stream is already open, stop it.
   stream = document.getElementById("preview").srcObject;
@@ -158,8 +177,9 @@ function on_device_selection(selectq) {
       id,
       {width: $(window).width(),
        height: $(window).height()},
-      on_stream_ready);
+      on_remote_stream_ready);
   } else {
+    $("#recording-stream-info").addClass('hidden');
     navigator.mediaDevices.getUserMedia(
       { video: {
           deviceId: device_id,
@@ -261,6 +281,7 @@ function on_replay() {
   playback.width = $(window).width();
   playback.height = $(window).height();
   $("#playback-background").show('slide', function() {
+      let playback_start_ms = Date.now();
       let vc;
       g_recorder.playback(playback,
                           g_replay_options.count,
@@ -268,10 +289,14 @@ function on_replay() {
                           function(pre_canvas) {
                             if (upload && root != "") {
                               vc = new VideoCapture(pre_canvas.captureStream());
+                            } else if (!upload) {
+                              console.log("No video upload planned.");
+                            } else {
+                              console.log("No video root name specified; will not upload.");
                             }
                           },
-                          function(findex) {
-                            if (vc && findex >= 1.0) {
+                          function() {
+                            if (vc) {
                               vc.stop(function(blob) { upload_video(root, blob); });
                               vc = null;
                             }
@@ -307,6 +332,8 @@ function on_setup() {
 </script>
 </head>
 <body>
+  <div id="fps"
+    style="position: fixed; bottom: 0; right: 0; width: 80px; height: 20px; z-index: 1000; text-align: right;"></div>
 
 <iframe id="interior" class="hidden full-window">
 </iframe>
@@ -323,6 +350,9 @@ function on_setup() {
 
 <div id="replay-setup" class="full-window block_buttons">
   <?php make_banner('Replay'); ?>
+<!-- Uncomment for debugging 
+  <div id="log"></div>
+-->
   <div id="recorder-warning" class="hidden">
     <h2>This browser does not support MediaRecorder.</h2>
     <p>Replay is still possible, but you can't upload videos.</p>
@@ -344,6 +374,9 @@ function on_setup() {
   <div id="device-picker-div">
     <select id="device-picker"><option>Please wait</option></select>
   </div>
+  <p id="recording-stream-info" class="hidden">
+    Recording at <span id="recording-stream-size"></span>
+  </p>
 
   <input type="checkbox" id="go-fullscreen" checked="checked"/>
   <label for="go-fullscreen">Change to fullscreen?</label>
@@ -352,8 +385,7 @@ function on_setup() {
   <label for="inner_url">URL:</label>
   <input type="text" name="inner_url" id="inner_url" size="100"
          value="<?php echo htmlspecialchars($kiosk_url, ENT_QUOTES, 'UTF-8'); ?>"/>
-  <input type="button" data-enhanced="true" value="Proceed"
-         onclick="on_proceed();"/>
+  <input type="button" value="Proceed" onclick="on_proceed();"/>
 </div>
 
 </body>

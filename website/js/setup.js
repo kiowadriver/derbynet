@@ -11,6 +11,8 @@
 //            classes:
 //            awards:
 //            settings:
+//            scenes:
+//            playlist:
 //            form_fields: {drivers:, radio:, sqlite_path:, odbc_dsn_name:}
 function populate_details(details) {
   $("#database_step div.status_icon img").attr('src', 'img/status/' + details.database.status + '.png');
@@ -19,13 +21,17 @@ function populate_details(details) {
   $("#classes_step div.status_icon img").attr('src', 'img/status/' + details.classes.status + '.png');
   $("#awards_step div.status_icon img").attr('src', 'img/status/' + details.awards.status + '.png');
   $("#settings_step div.status_icon img").attr('src', 'img/status/' + details.settings.status + '.png');
+  $("#scenes_step div.status_icon img").attr('src', 'img/status/' + details.scenes.status + '.png');
+  $("#playlist_step div.status_icon img").attr('src', 'img/status/' + details.playlist.status + '.png');
 
   var disabled = (details.schema.button == 'disabled') || !details.database.writable 
   // $("#settings_step input[type='submit']").prop('disabled', disabled);
   $("#roster_step a.button_link, "
     + "#classes_step a.button_link, "
     + "#awards_step a.button_link, "
-    + "#settings_step a.button_link").toggleClass('disabled', disabled);
+    + "#settings_step a.button_link, "
+    + "#scenes_step a.button_link,"
+    + "#playlist_step a.button_link").toggleClass('disabled', disabled);
   $("#purge_data_button")
     .prop('disabled', details.purge.nracers == 0 && details.purge.nawards == 0);
 
@@ -35,13 +41,13 @@ function populate_details(details) {
     $("#schema_button").prop('disabled', true).attr('value', 'Initialize');
   } else if (details.schema.button == 'initialize') {
     $("#schema_button").prop('disabled', false).attr('value', 'Initialize')
-      .on('click', function() { show_initialize_schema_modal(); });
+      .off('click').on('click', function() { show_initialize_schema_modal(); });
   } else if (details.schema.button == 'update') {
     $("#schema_button").prop('disabled', false).attr('value', 'Update Schema')
-      .on('click', function() { show_update_schema_modal(); });
+      .off('click').on('click', function() { show_update_schema_modal(); });
   } else /* 're-initialize' */ {
     $("#schema_button").prop('disabled', false).attr('value', 'Re-Initialize')
-      .on('click', function() { show_initialize_schema_modal(); });
+      .off('click').on('click', function() { show_initialize_schema_modal(); });
   }
 
   $("#classes_step a.button_link").text("Edit " + details.classes.plural);
@@ -52,14 +58,15 @@ function populate_details(details) {
   $("#classes_step div.step_details").html(details.classes.details);
   $("#awards_step div.step_details").html(details.awards.details);
   $("#settings_step div.step_details").html(details.settings.details);
+  $("#playlist_step div.step_details").html(details.playlist.details);
 
   function maybe_mark_driver_missing(driver, radio_id) {
     var driver_ok = ($.inArray(driver, details.form_fields.drivers) >= 0);
     if (driver_ok) {
-      $('#' + radio_id).checkboxradio('enable');
+      mobile_radio_enable($('#' + radio_id), true);
       $('label[for="' + radio_id + '"] span.missing_driver').html('');
     } else {
-      $('#' + radio_id).checkboxradio('disable');
+      mobile_radio_enable($('#' + radio_id), false);
       $('label[for="' + radio_id + '"] span.missing_driver').html('(Driver not loaded!)');
     }
   }
@@ -140,7 +147,7 @@ function report_success_xml(data) {
 function show_ezsetup_modal() {
   $('#ez_database_name').val('');
   $('#ez-old-nochoice').prop('selected', 'selected');
-  $('#ez_database_select').selectmenu('refresh');
+  mobile_select_refresh($('#ez_database_select'));
   show_modal("#ezsetup_modal", function(event) {
     handle_ezsetup_modal_submit();
     return false;
@@ -191,7 +198,6 @@ function show_advanced_database_modal() {
   // Merely setting the "checked" attribute doesn't trigger the "change"
   // handler that displays the right extra fields.
   $('input[name="connection_type"][checked]').click();
-  $('input[name="connection_type"]').checkboxradio("refresh");
 }
 
 function handle_advanced_database_modal_submit() {

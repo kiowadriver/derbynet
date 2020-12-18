@@ -52,26 +52,27 @@ function get_replay() {
                'trouble' => $trouble);
 }
 
-// Tells whether the replay service has recently reported (within the last
-// second or two) that it's playing back video.
-function replay_playing() {
-  $t = time();
-  return read_raceinfo('replay_reported', 0) == REPLAY_REPORTED_PLAYING
-      // This is a safeguard against the Replay app not reporting its state
-      // change correctly
-      && $t - read_raceinfo('replay_started_playing_at', 0) < 90
-      && $t - read_raceinfo('replay_last_contact', 0) < 2;
-}
-
 function send_replay_message($cmd) {
   global $db;
   $replay = get_replay();
   if ($replay['state'] == REPLAY_CONNECTED) {
-    // TODO: The trouble here is that the RaceInfo table's ItemValue may not be long enough for what we need,
-    // including file names
-    $db->beginTransaction();
-    write_raceinfo('replay_queue', read_raceinfo('replay_queue', '').$cmd."\n");
-    $db->commit();
+    // TODO: The trouble here is that the RaceInfo table's ItemValue may not be
+    // long enough for what we need, including file names
+    try {
+      if ($db->beginTransaction()) {
+        try {
+          write_raceinfo('replay_queue', read_raceinfo('replay_queue', '').$cmd."\n");
+          $db->commit();
+        } catch (PDOException $e) {
+          $db->rollBack();
+          error_log("send_replay_message: transaction rolled back: " + $e);
+        }
+      } else {
+        error_log("send_replay_message: beginTransaction returns false");
+      }
+    } catch (PDOException $e) {
+        error_log("send_replay_message: beginTransaction throws " + $e);
+    }
     $db->setAttribute(PDO::ATTR_AUTOCOMMIT);
     return true;
   } else {

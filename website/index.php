@@ -1,4 +1,10 @@
 <?php @session_start();
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// If you're seeing this page, your web server isn't configured correctly.  (PHP is not enabled.)
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // Redirects to setup page if the database hasn't yet been set up
 require_once('inc/data.inc');
 require_once('inc/schema_version.inc');
@@ -16,6 +22,10 @@ try {
   header('Location: setup.php');
   exit();
 }
+
+$show_voting_button =
+  $schema_version >= BALLOTING_SCHEMA &&
+  read_single_value('SELECT COUNT(*) FROM BallotAwards') > 0;
 
 // Returns true if we actually showed a button
 function make_link_button($label, $link, $permission, $button_class) {
@@ -117,6 +127,12 @@ make_spacer_if($need_spacer);
 $need_spacer = make_link_button('Race Dashboard', 'coordinator.php', SET_UP_PERMISSION, 'during_button');
 $need_spacer = make_link_button('Kiosk Dashboard', 'kiosk-dashboard.php', SET_UP_PERMISSION, 'during_button') || $need_spacer;
 $need_spacer = make_link_button('Judging', 'judging.php', JUDGING_PERMISSION, 'during_button') || $need_spacer;
+if (!have_permission(SET_UP_PERMISSION)) {
+  $need_spacer = make_link_button('Slideshow', 'slideshow.php', VIEW_RACE_RESULTS_PERMISSION, 'during_button') || $need_spacer;
+  if ($show_voting_button) {
+    $need_spacer = make_link_button('Vote!', 'vote.php', VIEW_RACE_RESULTS_PERMISSION, 'during_button') || $need_spacer;
+  }
+}
 
 // *********** During, part 2 ***************
 $need_spacer = make_link_button('Racers On Deck', 'ondeck.php', -1, 'during_button') || $need_spacer;

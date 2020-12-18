@@ -8,54 +8,102 @@
 // on the top finishers from the identified round.
 //
 // If roundid is empty, then we're generating an aggregate round, taking top
-// finishers across multiple previous rounds.  Those previous rounds are
-// identified by $_POST keys of the form roundid_<nnn>.  A new class will be
-// created for the round; $_POST['classname'] will be taken as the name of the
-// new class.
+// finishers across multiple previous rounds.  There are two ways this can happen:
 //
-// "top" identifies how many racers to select for the new round, but its interpretation also
-// depends on "bucketed".
+// - If $_POST['classname'] is present, then we're creating an aggregate round for
+//    a new aggregate class.  $_POST['classname'] will be taken as the name of
+//    the new class.
 //
-// For an aggregate round, if "bucketed" is true, then "top" tells how many
-// racers to choose from each of the prior rounds feeding in to the new round.
+//    The rounds whose results feed into the new aggregate round are identified
+//    by $_POST keys of the form $_POST['roundid_<nnn>'].
 //
-// For a non-aggreate round, if "bucketed" is true, then "top" tells how
-// many racers to choose from each subgroup.
+//  - If $_POST['classid'] is present, then we're creating an aggregate round
+//    based on a defined aggregate class.  The rounds whose results feed into
+//    the new aggregate round will be the highest defined round for each of the
+//    aggregate class' constituent classes.
 //
-// TODO: If racing isn't complete, selection of top finishers is likely to be wrong.
+// $_POST['top'] identifies how many racers to select for the new round, but its
+// interpretation also depends on $_POST['bucketed'].
+//
+// For an aggregate round, if $POST['bucketed'] is true, then $_POST['top']
+// tells how many racers to choose from each of the prior rounds feeding in to
+// the new round.
+//
+// For a non-aggregate round, if $_POST['bucketed'] is true, then $_POST['top']
+// tells how many racers to choose from each subgroup.
+//
+// For an "aggregate round by subgroup", we need two or more subgroups, posted
+// as $_POST['rankid_<nnn>'].  For each requested subgroup, we look at the
+// highest-numbered round for the corresponding (organic) class.
+//
+// (Note that this ignores any racing aggregate rounds that might draw racers
+// from the requested subgroups.)
+
 
 start_response();
 
-require_once('inc/standings.inc');
+require_once('inc/classes.inc');
 require_once('inc/newracer.inc');
 require_once('inc/aggregate_round.inc');
+require_once('inc/roster.inc');
+require_once('inc/rounds.inc');
 
 $bucket_limit = $_POST['top'];
 $bucketed = isset($_POST['bucketed']) && $_POST['bucketed'];
+$rankids = array();
 
 if (isset($_POST['roundid']) && strlen($_POST['roundid']) > 0) {
-  $aggregate = false;
+  $how_to_bucket = ROSTER_BUCKETED_ORGANIC;
   $roundid = $_POST['roundid'];
+  $constituent_roundids = array($roundid);
   list($classid, $old_round) = read_single_row('SELECT classid, round FROM Rounds'
                                                .' WHERE roundid = :roundid',
                                                array(':roundid' => $roundid));
   // TODO: Handle not-found case
   $new_round = 1 + $old_round;
 } else {
-  $aggregate = true;
-  $all_roundids = '0';
-  foreach ($_POST as $key => $value) {
-    if (substr($key, 0, strlen('roundid_')) == 'roundid_') {
-      $all_roundids .= ', '.substr($key, strlen('roundid_'));
-    }
-  }
-  // TODO: Handle 0 or 1 roundid's provided
+  $how_to_bucket = ROSTER_BUCKETED_AGGREGATE;
 
-  // A new aggregate round creates a new pseudo-class for the aggregate, and
-  // starts at round 1
+  // A new aggregate round starts at round 1 and may create a new pseudo-class
+  // for the aggregate.
   $new_round = 1;
 
-  $classid = create_aggregate_class($_POST['classname'], $all_roundids, false);
+  if (isset($_POST['classname'])) {
+    $constituent_roundids = array();
+    list($classes, $classseq, $ranks, $rankseq) = classes_and_ranks();
+    $highest_rounds = class_highest_rounds();
+    foreach ($_POST as $key => $value) {
+      if (substr($key, 0, strlen('roundid_')) == 'roundid_') {
+        $constituent_roundids[] = substr($key, strlen('roundid_'));
+      } else if (substr($key, 0, strlen('rankid_')) == 'rankid_') {
+        $r = substr($key, strlen('rankid_'));
+        $rankids[] = $r;
+        $constituent_roundids[] = $highest_rounds[$ranks[$r]['classid']];
+      }
+    }
+    $constituent_roundids = array_unique($constituent_roundids);
+    if (count($rankids) > 0) {
+      $how_to_bucket = ROSTER_BUCKETED_AGGREGATE_BY_SUBGROUP;
+    }
+
+    $classid = create_aggregate_class($_POST['classname'], $constituent_roundids, false);
+    // TODO: Handle 0 or 1 roundid's provided
+  } else {
+    $classid = $_POST['classid'];
+    $details = read_single_row('SELECT'
+                               .(schema_version() >= 3 ? ' constituents,' : ' \'\' AS constituents,')
+                               .(schema_version() >= 5 ? ' rankids' : ' \'\' AS rankids,')
+                               .' FROM Classes'
+                               .' WHERE classid = :classid',
+                               array(':classid' => $classid),
+                               PDO::FETCH_ASSOC);
+
+    $constituent_roundids = highest_rounds($details['constituents']);
+    if (!empty($details['rankids'])) {
+      $rankids = array_filter(explode(',', $details['rankids']), 'strlen');
+      $how_to_bucket = ROSTER_BUCKETED_AGGREGATE_BY_SUBGROUP;
+    }
+  }
 }
 
 // With $new_round and $classid settled, make the new round (unless it
@@ -74,81 +122,11 @@ if ($new_roundid) {
   $stmt->execute(array(':roundid' => $new_roundid));
 } else {
   // The usual case: make a whole new round
-  // phase/charttype are for GPRM compatibility only; I really don't know what they mean
-  $stmt = $db->prepare('INSERT INTO Rounds(round, classid, phase, charttype) VALUES(:round, :classid, 0, 0)');
-  $stmt->execute(array(':round' => $new_round,
-                       ':classid' => $classid));
-  $stmt->closeCursor();
-  $new_roundid = read_single_value('SELECT roundid FROM Rounds'
-                                   .' WHERE round = :round'
-                                   .'  AND classid = :classid',
-                                   array(':round' => $new_round,
-                                         ':classid' => $classid));
+  $new_roundid = make_new_round($classid, $new_round);
 }
 
-$buckets = array();  // bucketno => array of { racerid , score }
-
-// If top n across the whole unit or den, bucketno is a constant (1)
-// If bucketed, bucketno is rankid (for a den) or classid (for aggreate).
-$bucketno_expr = '1';
-
-if ($aggregate) {
-  if ($bucketed) {
-    $bucketno_expr = 'Result.roundid';
-  }
-} else {
-  $all_roundids = $roundid;
-  if ($bucketed) {
-    $bucketno_expr = 'RegistrationInfo.rankid';
-  }
-}
-
-// Rounds(roundid, round, classid)
-// Roster(rosterid, roundid, classid, racerid)
-// RaceChart(resultid, classid, roundid, heat, lane, racerid, finishtime, completed)
-// RegistrationInfo(racerid, ..., classid, rankid)
-$stmt = $db->prepare('SELECT Result.racerid, '.$bucketno_expr.' AS bucketno, score'
-                     .' FROM (SELECT racerid, Rounds.roundid, '
-                     .sql_scoring_expression('finishtime', 'finishplace').' AS score'
-                     .'       FROM RaceChart'
-                     .'       INNER JOIN Rounds'
-                     .'       ON RaceChart.roundid = Rounds.roundid'
-                     .'       WHERE RaceChart.roundid IN ('.$all_roundids.')'
-                     .' AND (finishtime IS NOT NULL OR finishplace IS NOT NULL)'
-					 // This is basically "GROUP BY racerid"; racerid will
-					 // determine Rounds.roundid uniquely, unless a racer is
-					 // part of two different constituent rounds; in that case,
-					 // we'll treat that racer like two different racers.
-                     .'       GROUP BY racerid, Rounds.roundid) AS Result'
-                     .' INNER JOIN RegistrationInfo'
-                     .'  ON Result.racerid = RegistrationInfo.racerid'
-                     .' WHERE passedinspection = 1 AND exclude = 0'
-                     .' ORDER BY score');
-$stmt->execute(array());
-foreach ($stmt as $row) {
-  $bucketno = $row['bucketno'];
-  if (!isset($buckets[$bucketno])) {
-    $buckets[$bucketno] = array();
-  }
-  $n_in_bucket = count($buckets[$bucketno]);
-  if ($n_in_bucket < $bucket_limit ||
-      // If there's a tie for third when picking top 3, include additional finalists
-      $buckets[$bucketno][$n_in_bucket - 1]['score'] >= $row['score']) {
-    echo "<finalist racerid=\"".$row['racerid']."\" bucket_number=\"".$bucketno."\"/>\n";
-    $buckets[$bucketno][] = array('racerid' => $row['racerid'], 'score' => $row['score']);
-  }
-}
-$stmt->closeCursor();
-
-$stmt = $db->prepare('INSERT INTO Roster(roundid, classid, racerid)'
-                     .' VALUES(:roundid, :classid, :racerid)');
-foreach ($buckets as $bucket) {
-  foreach ($bucket as $racer) {
-    $stmt->execute(array(':roundid' => $new_roundid,
-                         ':classid' => $classid,
-                         ':racerid' => $racer['racerid']));
-  }
-}
+populate_roster($bucketed ? $how_to_bucket : ROSTER_UNBUCKETED, $new_roundid, $classid, $bucket_limit,
+                $constituent_roundids, $rankids);
 
 echo "<new-round roundid=\"".$new_roundid."\"/>\n";
 echo "<success/>\n";

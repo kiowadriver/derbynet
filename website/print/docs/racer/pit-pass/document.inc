@@ -5,8 +5,15 @@ class PitPassDocument extends PrintableRacerDocument {
 
   function get_available_options() {
     return array(
+      'layout' => array('type' => 'radio',
+                        'desc' => 'Medium',
+                        'values' =>
+                        array(array('value' => '4-up',
+                                    'desc' => '8-1/2 x 11, 4-up'),
+                              array('value' => '4x6',
+                                    'desc' => '4x6'))),
       'with_logo' => array('type' => 'bool',
-                           'desc' => 'Include Cub Scout logo in frame',
+                           'desc' => 'Include logo image in frame',
                            'default' => true),
       'event_title1' => array('type' => 'string',
                               'desc' => 'First line of event name, to be included in frame',
@@ -17,24 +24,51 @@ class PitPassDocument extends PrintableRacerDocument {
       );
   }
 
-  protected $y_coords = array(
-    'title-rect' => 0.10,
-    'title1' => 0.22,
-    'title2' => 0.36,
-    'imagefile' => 0.6,
-    'namebox' => 0.50,
-    // Not really enough height to fit in the car name
-    // on this version.
-    'carname' => 0,
-    'carnumber' => 3.82,
-    'yellow-car' => 3.125,
-    'date-rect' => 4.62,
-    'date' => 4.82,
-    );
+  protected $y_coords;
 
   function StartDocument() {
-    $this->initialize_pdf('P', 'in', 'Letter');
-    $this->initialize_layout(3.825, 5.000);
+    $this->set_parameters($this->get_option('layout'));
+    if ($this->get_option('layout') == '4x6') {
+      $this->initialize_pdf('P', 'in', array(4, 6));
+      $this->initialize_layout(3.825, 6);
+    } else {
+      $this->initialize_pdf('P', 'in', 'Letter');
+      $this->initialize_layout(3.825, 5.000);
+    }
+  }
+
+  function set_parameters($layout) {
+    if ($layout == '4-up') {
+      $this->y_coords = array(
+        'title-rect' => 0.10,
+        'title1' => 0.22,
+        'title2' => 0.36,
+        'imagefile' => 0.6,
+        'namebox' => 0.50,
+        // Not really enough height to fit in the car name
+        // on this version.
+        'carname' => 0,
+        'carnumber' => 3.82,
+        'yellow-car' => 3.125,
+        'logo' => 4.061,
+        'date-rect' => 4.62,
+        'date' => 4.82,
+        );
+    } else if ($layout == '4x6') {
+      $this->y_coords = array(
+        'title-rect' => 0.10,
+        'title1' => 0.22,
+        'title2' => 0.36,
+        'imagefile' => 0.6,
+        'namebox' => 3.5,
+        'carname' => 4.02,
+        'carnumber' => 4.35,
+        'yellow-car' => 4.125,
+        'logo' => 5.061,
+        'date-rect' => 5.62,
+        'date' => 5.82,
+        );
+    }
   }
 
  function DrawOneAt($x, $y, &$racer) {
@@ -53,6 +87,9 @@ class PitPassDocument extends PrintableRacerDocument {
     }
 
     $this->DrawBorder($x, $y);
+    if ($this->get_option('with_logo')) {
+      $this->DrawLogo($x + 0.058, $y + $this->y_coords['logo']);
+    }
 
     $this->DrawNameBox($x, $y + $this->y_coords['namebox'], $racer);
 
@@ -111,45 +148,16 @@ class PitPassDocument extends PrintableRacerDocument {
   }
 
   protected function DrawBorder($x, $y) {
-    if ($this->get_option('with_logo')) {
-      $file_path = '/pit-pass-frame-logo.png';
+    if ($this->get_option('layout') == '4x6') {
+      $this->pdf->Image(dirname(__FILE__).'/pit-pass-frame-4x6.png', $x, $y, 3.825, 6.000);
     } else {
-      $file_path = '/pit-pass-frame.png';
+      $this->pdf->Image(dirname(__FILE__).'/pit-pass-frame.png', $x, $y, 3.825, 5.000);
     }
-
-    $this->pdf->Image(dirname(__FILE__).$file_path, $x, $y, 3.825, 5.000);
-  }
-}
-
-class PitPass4x6 extends PitPassDocument {
-  function name() { return "Pit Pass 4x6"; }
-
-  protected $y_coords = array(
-    'title-rect' => 0.10,
-    'title1' => 0.22,
-    'title2' => 0.36,
-    'imagefile' => 0.6,
-    'namebox' => 3.5,
-    'carname' => 4.02,
-    'carnumber' => 4.35,
-    'yellow-car' => 4.125,
-    'date-rect' => 5.62,
-    'date' => 5.82,
-    );
-
-  public function StartDocument() {
-    $this->initialize_pdf('P', 'in', array(4, 6));
-    $this->initialize_layout(3.825, 6);
   }
 
-  protected function DrawBorder($x, $y) {
-    if ($this->get_option('with_logo')) {
-      $file_path = '/pit-pass-frame-4x6-logo.png';
-    } else {
-      $file_path = '/pit-pass-frame-4x6.png';
-    }
-
-    $this->pdf->Image(dirname(__FILE__).$file_path, $x, $y, 3.825, 6.000);
+  protected function DrawLogo($x, $y) {
+    $this->pdf->Image(image_file_path('emblem.png'),
+                      $x, $y, 0.886, 0.886);
   }
 }
 

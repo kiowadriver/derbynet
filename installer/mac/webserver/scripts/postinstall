@@ -1,0 +1,13 @@
+#! /bin/sh
+
+./maybe-create-local-directory.sh
+./create-apache-derbynet-directory.sh
+./create-or-update-php-ini.sh
+./update-apache-config.sh
+./maybe-rewrite-index-html.sh
+
+# Make Apache run after (every) restart
+launchctl enable system/org.apache.httpd
+
+
+open http://localhost/derbynet

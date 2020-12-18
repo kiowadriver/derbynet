@@ -16,6 +16,9 @@ class AwanaDriversLicenseDocument extends PrintableRacerDocument {
       'use_barcode' => array('type' => 'bool',
                              'desc' => 'Include barcode',
                              'default' => false),
+      'date_of_issue' => array('type' => 'string',
+                               'desc' => 'Date of Issue',
+                               'default' => date('F j, Y')),
       );
   }
 
@@ -31,6 +34,8 @@ class AwanaDriversLicenseDocument extends PrintableRacerDocument {
   }
 
   function DrawOneAt($x, $y, &$racer) {
+    $issue_date = new DateTimeImmutable($this->get_option('date_of_issue'));
+    
     $this->DrawBanner($x, $y);
     $this->pdf->RoundedRect($x, $y, 3, 1.75, 0.1);
 
@@ -66,9 +71,11 @@ class AwanaDriversLicenseDocument extends PrintableRacerDocument {
                              array(new SetFontTag('Times', 'B', 14), $racer['firstname']." ",
                                    new SetFontTag('Times', 'B', 14), $racer['lastname']));
 
-    $this->pdf->DrawSequence($x + 0.90, $y + 0.95,
-                             array(new SetFontTag('Times', '', 10), group_label().": ",
-                                   new SetFontTag('Times', 'B', 10), $racer['class']));
+    if (use_groups()) {
+      $this->pdf->DrawSequence($x + 0.90, $y + 0.95,
+                               array(new SetFontTag('Times', '', 10), group_label().": ",
+                                     new SetFontTag('Times', 'B', 10), $racer['class']));
+    }
 
     $this->pdf->CenteredSequence($x + 2.35, $y + 1.075,
                                  array(new SetFontTag('Arial', 'B', 24), $racer['carnumber']));
@@ -79,7 +86,9 @@ class AwanaDriversLicenseDocument extends PrintableRacerDocument {
     
     $this->pdf->DrawSequence($x + 0.90, $y + 1.5,
                              array(new SetFontTag('Times', '', 10), 'Issued on the ',
-                                   new SetFontTag('Times', '', 10), $this->ordinal(date('z')), ' day of ', date('Y')));
+                                   new SetFontTag('Times', '', 10),
+                                   $this->ordinal(1 + $issue_date->format('z')), ' day of ',
+                                   $issue_date->format('Y')));
     if (!$this->get_option('use_barcode')) {
       $y = $y + 0.05;
     }

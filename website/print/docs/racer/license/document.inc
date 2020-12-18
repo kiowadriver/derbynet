@@ -13,6 +13,9 @@ class DriversLicenseDocument extends PrintableRacerDocument {
       'use_barcode' => array('type' => 'bool',
                              'desc' => 'Include barcode',
                              'default' => true),
+      'date_of_issue' => array('type' => 'string',
+                               'desc' => 'Date of Issue',
+                               'default' => date('F j, Y')),
       );
   }
 
@@ -24,6 +27,8 @@ class DriversLicenseDocument extends PrintableRacerDocument {
   }
 
   function DrawOneAt($x, $y, &$racer) {
+    $issue_date = new DateTimeImmutable($this->get_option('date_of_issue'));
+    
     $this->pdf->RoundedRect($x, $y, 3.5, 2.5, 0.125);
 
     $this->DrawBanner($x, $y);
@@ -31,16 +36,18 @@ class DriversLicenseDocument extends PrintableRacerDocument {
     // $this->DrawBannerText($x, $y);
 
     // Logo in the lower left
-    $this->pdf->Image(dirname(__FILE__).'/cubscout_emblem_300.png',
+    $this->pdf->Image(image_file_path('emblem.png'),
                       $x + 0.05, $y + 1.95, 0.5, 0.5);
 
     $this->pdf->DrawSequence($x + 0.25, $y + 0.7,
                              array(new SetFontTag('Times', '', 14), $racer['firstname']." ",
                                    new SetFontTag('Times', 'B', 14), $racer['lastname']));
 
-    $this->pdf->DrawSequence($x + 0.25, $y + 0.90,
-                             array(new SetFontTag('Times', '', 10), group_label().": ",
-                                   new SetFontTag('Times', 'B', 10), $racer['class']));
+    if (use_groups()) {
+      $this->pdf->DrawSequence($x + 0.25, $y + 0.90,
+                               array(new SetFontTag('Times', '', 10), group_label().": ",
+                                     new SetFontTag('Times', 'B', 10), $racer['class']));
+    }
 
     if (!$this->get_option('use_photo')) {
     } else if ($racer['imagefile']) {
@@ -66,7 +73,7 @@ class DriversLicenseDocument extends PrintableRacerDocument {
 //                                   new SetFontTag('Times', 'B', 10), 'Must follow Cub Scout Law'));
     $this->pdf->DrawSequence($x + 0.75, $y + 2.25,
                              array(new SetFontTag('Times', '', 10), 'Date of Issue: ',
-                                   new SetFontTag('Times', 'B', 10), date('l, F j, Y')));
+                                   new SetFontTag('Times', 'B', 10), $issue_date->format('l, F j, Y')));
 
     $this->pdf->SetFillColor(0x02, 0x38, 0x82);
     $this->pdf->Rect($x + 0.625, $y + 2.285, 2.75, 0.15, 'F');

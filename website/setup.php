@@ -9,14 +9,14 @@ require_permission(SET_UP_PERMISSION);
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
 <title>DerbyNet Set-Up</title>
-<link rel="stylesheet" type="text/css" href="css/jquery.mobile-1.4.2.css"/>
+<link rel="stylesheet" type="text/css" href="css/jquery-ui.min.css"/>
+<link rel="stylesheet" type="text/css" href="css/mobile.css"/>
 <?php require('inc/stylesheet.inc'); ?>
 <link rel="stylesheet" type="text/css" href="css/setup.css"/>
 <script type="text/javascript" src="js/jquery.js"></script>
 <script type="text/javascript" src="js/ajax-setup.js"></script>
-<script type="text/javascript" src="js/jquery-ui-1.10.4.min.js"></script>
-<script type="text/javascript" src="js/mobile-init.js"></script>
-<script type="text/javascript" src="js/jquery.mobile-1.4.2.min.js"></script>
+<script type="text/javascript" src="js/jquery-ui.min.js"></script>
+<script type="text/javascript" src="js/mobile.js"></script>
 <script type="text/javascript" src="js/modal.js"></script>
 <script type="text/javascript" src="js/chooser.js"></script>
 <script type="text/javascript" src="js/setup.js"></script>
@@ -25,7 +25,6 @@ require_permission(SET_UP_PERMISSION);
 <?php make_banner('Set-Up'); ?>
 <?php
 
-require_once('inc/ajax-failure.inc'); // Must follow jquery
 require_once('inc/parse-connection-string.inc');
 require_once('inc/details-for-setup-page.inc');
 require_once('inc/default-database-directory.inc');
@@ -71,7 +70,7 @@ $(function() { populate_details(<?php echo $initial_details; ?>); });
   <div class="status_icon"><img/></div>
 
   <div class="step_button block_buttons">
-    <input type="button" data-enhanced="true" value="Choose Database" onclick="show_ezsetup_modal()"/>
+    <input type="button" value="Choose Database" onclick="show_ezsetup_modal()"/>
   </div>
 
   <div class="step_details"></div>
@@ -83,14 +82,14 @@ $(function() { populate_details(<?php echo $initial_details; ?>); });
 
   <div class="upper">
     <div class="step_button block_buttons">
-      <input id="schema_button" type="button" data-enhanced="true"/>
+      <input id="schema_button" type="button"/>
     </div>
     <div id="schema_details" class="step_details"></div>
   </div>
 
   <div class="lower">
     <div class="step_button block_buttons">
-      <input id="purge_data_button" type="button" data-enhanced="true"
+      <input id="purge_data_button" type="button"
              value="Purge Data" onclick="show_purge_modal()"/>
     </div>
 
@@ -146,6 +145,28 @@ $(function() { populate_details(<?php echo $initial_details; ?>); });
   <div class="step_details"></div>
 </div>
 
+<!-- Scenes and Racing Playlist -->
+<div id="scenes_step" class="step_div">
+  <div class="status_icon"><img src="img/status/ok.png"/></div>
+  <div class="step_button block_buttons">
+    <a class="button_link" href="scenes.php">Scenes</a>
+  </div>
+
+  <div class="step_details">
+    <p>If you're fortunate enough to have multiple screens for DerbyNet, scenes can help 
+       make managing them easier.</p>
+  </div>
+</div>
+
+<?php require_once('inc/ajax-failure.inc'); ?>
+
+<div id="playlist_step" class="step_div">
+  <div class="status_icon"><img src="img/status/ok.png"/></div>
+  <div class="step_button block_buttons">
+    <a class="button_link" href="playlist.php?back=setup.php">Rounds Playlist</a>
+  </div>
+  <div class="step_details"></div>
+</div>
 
 <div id="ezsetup_modal" class="modal_dialog hidden block_buttons">
   <form>
@@ -170,11 +191,11 @@ if (count($ez_configs) > 0) {
 <?php } ?>
 
     <br/>
-    <input type="submit" data-enhanced="true" value="Submit"/>
-    <input type="button" data-enhanced="true" value="Cancel"
+    <input type="submit" value="Submit"/>
+    <input type="button" value="Cancel"
       onclick="close_modal('#ezsetup_modal');"/>
     <br/>
-    <input type="button" data-enhanced="true" value="Advanced"
+    <input type="button" value="Advanced"
       onclick="show_advanced_database_modal()"/>
   </form>
 </div>
@@ -186,7 +207,7 @@ if (count($ez_configs) > 0) {
 ?>
     <input type="hidden" name="action" value="setup.nodata"/>
 
-    <input id="sqlite_connection" type="radio" name="connection_type" value="sqlite"/>
+    <input id="sqlite_connection" type="radio" name="connection_type" value="sqlite" checked="checked"/>
     <label for="sqlite_connection">SQLite data source<span class="missing_driver"></span></label>
 
     <input id="odbc_connection" type="radio" name="connection_type" value="odbc"/>
@@ -201,7 +222,7 @@ if (count($ez_configs) > 0) {
     </div>
 
     <div id="for_sqlite_connection" class="hidden connection_details">
-      <input type="button" data-enhanced="true" id="browse_for_sqlite"
+      <input type="button" id="browse_for_sqlite"
        value="Browse"
        onclick='show_choose_file_modal($("#sqlite_path").val(), "new.sqlite",
                                        function(fullpath) {
@@ -224,8 +245,8 @@ if (count($ez_configs) > 0) {
             ?>/>
     </div>
 
-    <input type="submit" data-enhanced="true" value="Submit"/>
-    <input type="button" data-enhanced="true" value="Cancel"
+    <input type="submit" value="Submit"/>
+    <input type="button" value="Cancel"
       onclick='close_modal("#advanced_database_modal");'/>
   </form>
 </div>
@@ -236,8 +257,8 @@ if (count($ez_configs) > 0) {
     <p>Initializing the schema will wipe out any existing data in the 
     database, and cannot be undone.  Are you sure that's what you want to do?</p>
 
-    <input type="submit" data-enhanced="true" value="Initialize"/>
-    <input type="button" data-enhanced="true" value="Cancel"
+    <input type="submit" value="Initialize"/>
+    <input type="button" value="Cancel"
       onclick='close_secondary_modal("#initialize_schema_modal");'/>
   </form>
 </div>
@@ -248,8 +269,8 @@ if (count($ez_configs) > 0) {
       that's already in the database.  Updating the schema cannot be undone.
       Are you sure that's what you want to do?</p>
 
-    <input type="submit" data-enhanced="true" value="Update Schema"/>
-    <input type="button" data-enhanced="true" value="Cancel"
+    <input type="submit" value="Update Schema"/>
+    <input type="button" value="Cancel"
       onclick='close_modal("#update_schema_modal");'/>
   </form>
 </div>
@@ -260,7 +281,7 @@ if (count($ez_configs) > 0) {
 
     <div class="purge_div">
       <div class="purge_button block_buttons">
-        <input type="button" data-enhanced="true" id="delete_race_results" value="Delete Race Results"
+        <input type="button" id="delete_race_results" value="Delete Race Results"
                 onclick="confirm_purge('results');"/>
       </div>
       <p id="purge_results_para"><span id="purge_nresults_span"></span> completed heat(s)</p>
@@ -268,7 +289,7 @@ if (count($ez_configs) > 0) {
 
     <div class="purge_div">
       <div class="purge_button block_buttons">
-        <input type="button" data-enhanced="true" id="delete_schedules" value="Delete Schedules"
+        <input type="button" id="delete_schedules" value="Delete Schedules"
                 onclick="confirm_purge('schedules');"/>
       </div>
       <p id="purge_schedules_para"><span id="purge_nschedules_span"></span> scheduled heat(s)</p>
@@ -276,7 +297,7 @@ if (count($ez_configs) > 0) {
 
     <div class="purge_div">
       <div class="purge_button block_buttons">
-        <input type="button" data-enhanced="true" id="delete_racers" value="Delete Racers"
+        <input type="button" id="delete_racers" value="Delete Racers"
                 onclick="confirm_purge('racers');"/>
       </div>
       <p id="purge_racers_para"><span id="purge_nracers_span"></span> registered racer(s)</p>
@@ -284,7 +305,7 @@ if (count($ez_configs) > 0) {
                                                 <!-- TODO delete classes/ranks? -->
     <div class="purge_div">
       <div class="purge_button block_buttons">
-        <input type="button" data-enhanced="true" id="delete_awards" value="Delete Awards"
+        <input type="button" id="delete_awards" value="Delete Awards"
                 onclick="confirm_purge('awards');"/>
       </div>
       <p id="purge_awards_para"><span id="purge_nawards_span"></span> award(s)</p>
@@ -292,13 +313,13 @@ if (count($ez_configs) > 0) {
 
     <div class="purge_div">
       <div class="purge_button block_buttons">
-        <input type="button" data-enhanced="true" value="Re-Initialize"
+        <input type="button" value="Re-Initialize"
                onclick="show_initialize_schema_modal();"/>
       </div>
       <p>Delete everything in the database</p>
     </div>
                                                 
-    <input type="button" data-enhanced="true" value="Cancel"
+    <input type="button" value="Cancel"
       onclick='close_modal("#purge_modal");'/>
 
   </div>
@@ -312,8 +333,8 @@ if (count($ez_configs) > 0) {
   <p>from the database.  This operation cannot be undone.
      Are you sure that's what you want to do?</p>
 
-    <input type="submit" data-enhanced="true" value="Purge"/>
-    <input type="button" data-enhanced="true" value="Cancel"
+    <input type="submit" value="Purge"/>
+    <input type="button" value="Cancel"
       onclick='close_secondary_modal("#purge_confirmation_modal");'/>
   </form>
 </div>

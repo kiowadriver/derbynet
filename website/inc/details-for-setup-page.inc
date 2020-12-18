@@ -109,7 +109,7 @@ function inspect_database() {
         $result['schema_status'] = "unknown";
         $result['schema_button'] = 'update';
         $result['schema_message'] = "<p>Schema version is S1".pad3($schema_version)
-            .", but version S1".pad3(expected_schema_version())." would be preferred.</p>\n";
+            .", but <b>version S1".pad3(expected_schema_version())." would be preferred.</b></p>\n";
       }
     } catch (PDOException $p) {
       $result['schema_status'] = "trouble";
@@ -294,6 +294,11 @@ function build_setup_page_details() {
                                  ." to enter individual awards.)</p>\n"),
                'settings' => array('status' => $schema['settings_icon'],
                                    'details' => "<p>".$schema['settings_details']."</p>\n"),
+               'scenes' => array('status' => $db_ok ? 'ok' : 'unknown'),
+               'playlist' => array('status' => count($schema['dens']) == 0 ? "unknown" : "ok",
+                                   'details' => count($schema['dens']) == 0
+                                   ? "<p>There are no rounds defined.</p>"
+                                   : "<p>Automate round-to-round changes.</p>"),
                'form_fields' => build_form_fields_for_advanced_database_dialog($db_connection_string)
     );
 }
